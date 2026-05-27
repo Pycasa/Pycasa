@@ -3,40 +3,85 @@ import logo from './assets/logo.png';
 
 const screenshots = [
   {
-    id: 'timeline',
-    label: 'Timeline',
-    src: './pycasa1.png',
-    title: 'Pycasa — Chronological Timeline View',
+    id: 'timeline-light-slider',
+    label: 'Timeline View',
+    src: './screenshots/timeline-light-slider.png',
+    title: 'Timeline View with slider for fast image browsing by time - Just like in Google Photos',
   },
   {
-    id: 'gallery',
-    label: 'Gallery',
-    src: './pycasa2.png',
-    title: 'Pycasa — Grid Gallery with Filters',
+    id: 'gallery-light',
+    label: 'Gallery View',
+    src: './screenshots/gallery-light.png',
+    title: 'View images in a grid layout - Classic Photo Gallery',
   },
   {
-    id: 'ai-tags',
-    label: 'AI Tags',
-    src: './pycasa3.png',
-    title: 'Pycasa — AI-Generated Descriptions & Tags',
+    id: 'ai-analysis-image-preview',
+    label: 'AI Image Analysis',
+    src: './screenshots/ai-analysis-image-preview.png',
+    title: 'Clicking on the "AI Analyse" button triggers AI-powered image analysis and adds description and tags to the image',
   },
   {
-    id: 'detail',
-    label: 'Image Detail',
-    src: './pycasa4.png',
-    title: 'Pycasa — Image Detail Modal',
+    id: 'image-preview-fullscreen',
+    label: 'Fullscreen Preview',
+    src: './screenshots/image-preview-fullscreen.png',
+    title: 'Image Preview Fullscreen with zoom in and zoom out controls and to reset view',
   },
   {
-    id: 'settings',
-    label: 'Settings',
-    src: './pycasa5.png',
-    title: 'Pycasa — AI & Folder Settings',
+    id: 'timeline-dark',
+    label: 'Dark Mode',
+    src: './screenshots/timeline-dark.png',
+    title: 'Switch between light and dark themes',
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    src: './pycasa6.png',
-    title: 'Pycasa — Real-time Notifications',
+    src: './screenshots/notifications.png',
+    title: 'Get real-time notifications about the status of scan and AI analysis',
+  },
+  {
+    id: 'settings-scan-images',
+    label: 'Scan Image Folders',
+    src: './screenshots/settings-scan-images.png',
+    title: 'Settings for Scanning Images from Multiple Folders - Configure folders to scan for images',
+  },
+  {
+    id: 'ai-service-select',
+    label: 'AI Service Selection',
+    src: './screenshots/ai-service-select.png',
+    title: 'Select the AI service you would like to use for running image analysis. Ollama or Google Gemini.',
+  },
+  {
+    id: 'ai-service-ollama',
+    label: 'Ollama as AI service',
+    src: './screenshots/ai-service-ollama.png',
+    title: 'Configure Ollama as an AI service - Ollama is a free, open-source AI platform that allows you to run large language models on your own computer.',
+  },
+  {
+    id: 'ai-service-gemini-openai',
+    label: 'Google Gemini or OpenAI',
+    src: './screenshots/ai-service-gemini-openai.png',
+    title: 'Configure Google Gemini or OpenAI as an AI service.',
+  },
+  {
+    id: 'settings-ocr',
+    label: 'OCR Settings',
+    src: './screenshots/settings-ocr.png',
+    title: 'Configure OCR - Uses Tesseract OCR for extracting text from images',
+  },
+
+
+
+  {
+    id: 'ai-analysis-trigger',
+    label: 'Trigger Analysis on All Images',
+    src: './screenshots/ai-analysis-trigger.png',
+    title: 'Trigger Analysis on All Images. Starts a background job to analyze all images in the database.',
+  },
+    {
+    id: 'login',
+    label: 'Login',
+    src: './screenshots/login.png',
+    title: 'Login',
   },
 ];
 
@@ -277,8 +322,8 @@ export default function App() {
 
         <div className="demo-frame">
           <div className="demo-bar">
-            <span className="dot red" /><span className="dot yellow" /><span className="dot green" />
-            <span className="demo-bar-title">pycasa — {currentScreenshot.title}</span>
+            {/* <span className="dot red" /><span className="dot yellow" /><span className="dot green" /> */}
+            <span className="demo-bar-title">{currentScreenshot.title}</span>
           </div>
           <div className="demo-img-wrap">
             <img
@@ -458,7 +503,7 @@ export default function App() {
           <span className="creds-icon">🔑</span>
           <div>
             <strong>Default login:</strong> username <code>admin</code> · password <code>admin</code>
-            <span className="creds-note"> — change this after first login</span>
+            <span className="creds-note"></span>
           </div>
         </div>
       </section>
