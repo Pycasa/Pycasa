@@ -35,7 +35,7 @@ Pycasa is a self-hosted photo management application that runs entirely on your 
 ### One-liner install (requires Java 17+)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/amithkoujalgi/Pycasa/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Pycasa/Pycasa/main/install.sh | bash
 ```
 
 The script downloads the latest release JAR to `~/.pycasa/`, installs a `pycasa` launcher to `/usr/local/bin`, and prints the URL to open.

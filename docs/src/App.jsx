@@ -100,15 +100,15 @@ const features = [
 const installCommands = {
   jar: {
     comment: '# One-liner install — requires Java 17+',
-    cmd: 'curl -fsSL https://raw.githubusercontent.com/amithkoujalgi/Pycasa/main/install.sh | bash',
+    cmd: 'curl -fsSL https://raw.githubusercontent.com/Pycasa/Pycasa/main/install.sh | bash',
   },
   docker: {
     comment: '# Run with Docker. Get your GitHub token from https://github.com/settings/tokens',
-    cmd: 'echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin; docker run -d -p 8080:8080 -v ~/Pictures:/photos --name pycasa ghcr.io/amithkoujalgi/pycasa:latest',
+    cmd: 'echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin; docker run -d -p 8080:8080 -v ~/Pictures:/photos --name pycasa ghcr.io/Pycasa/pycasa:latest',
   },
   build: {
     comment: '# Build from source',
-    cmd: 'git clone https://github.com/amithkoujalgi/Pycasa.git && cd Pycasa && make build && java -jar target/pycasa-server-*-runner.jar',
+    cmd: 'git clone https://github.com/Pycasa/Pycasa.git && cd Pycasa && make build && java -jar target/pycasa-server-*-runner.jar',
   },
 };
 
