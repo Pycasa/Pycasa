@@ -1,0 +1,348 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 20 20% 96%;
+    --foreground: 20 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 10% 10%;
+    --primary: 153 38% 18%;
+    /* Dark Forest Green #1A4332 */
+    --primary-foreground: 35 30% 95%;
+    --secondary: 40 10% 90%;
+    --secondary-foreground: 20 10% 10%;
+    --muted: 40 10% 90%;
+    --muted-foreground: 20 10% 40%;
+    --accent: 40 10% 90%;
+    --accent-foreground: 20 10% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 20 10% 85%;
+    --input: 20 10% 85%;
+    --ring: 153 38% 18%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 220 15% 10%;
+    --foreground: 40 20% 92%;
+    --card: 220 15% 14%;
+    --card-foreground: 40 20% 92%;
+    --popover: 220 15% 14%;
+    --popover-foreground: 40 20% 92%;
+    --primary: 153 38% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 40 20% 92%;
+    --muted: 220 15% 20%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 220 15% 20%;
+    --accent-foreground: 40 20% 92%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 153 38% 40%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-[#F5F1ED] text-gray-900;
+    font-family: 'Poppins', 'Inter', sans-serif;
+  }
+
+  .dark body,
+  html.dark body {
+    background-color: hsl(220, 15%, 10%);
+    color: hsl(40, 20%, 92%);
+  }
+}
+
+/* ============================================================
+   DARK MODE OVERRIDES
+   Covers all hardcoded Tailwind bg/text/border classes used
+   throughout the app without needing to touch every JSX file.
+   ============================================================ */
+
+/* Page backgrounds */
+.dark .bg-white          { background-color: hsl(220, 15%, 14%) !important; }
+.dark .bg-gray-50        { background-color: hsl(220, 15%, 12%) !important; }
+.dark .bg-slate-50       { background-color: hsl(220, 15%, 12%) !important; }
+.dark .bg-slate-100      { background-color: hsl(220, 15%, 18%) !important; }
+.dark .bg-slate-200      { background-color: hsl(220, 15%, 22%) !important; }
+.dark .bg-gray-200       { background-color: hsl(220, 15%, 25%) !important; }
+
+/* Semi-transparent whites */
+.dark .bg-white\/50      { background-color: hsla(220, 15%, 14%, 0.8) !important; }
+.dark .bg-white\/10      { background-color: hsla(220, 15%, 14%, 0.3) !important; }
+.dark .bg-slate-50\/50   { background-color: hsla(220, 15%, 12%, 0.5) !important; }
+
+/* Text */
+.dark .text-gray-900     { color: hsl(40, 20%, 92%) !important; }
+.dark .text-gray-700     { color: hsl(220, 10%, 75%) !important; }
+.dark .text-gray-600     { color: hsl(220, 10%, 65%) !important; }
+.dark .text-gray-500     { color: hsl(220, 10%, 55%) !important; }
+.dark .text-gray-400     { color: hsl(220, 10%, 45%) !important; }
+.dark .text-slate-900    { color: hsl(40, 20%, 92%) !important; }
+.dark .text-slate-800    { color: hsl(40, 15%, 85%) !important; }
+.dark .text-slate-700    { color: hsl(220, 10%, 75%) !important; }
+.dark .text-slate-600    { color: hsl(220, 10%, 65%) !important; }
+.dark .text-slate-500    { color: hsl(220, 10%, 55%) !important; }
+.dark .text-slate-400    { color: hsl(220, 10%, 45%) !important; }
+
+/* Borders */
+.dark .border-slate-100  { border-color: hsl(220, 15%, 22%) !important; }
+.dark .border-slate-200  { border-color: hsl(220, 15%, 25%) !important; }
+.dark .border-gray-100   { border-color: hsl(220, 15%, 22%) !important; }
+.dark .border-gray-200   { border-color: hsl(220, 15%, 25%) !important; }
+.dark .divide-slate-100 > * + * { border-color: hsl(220, 15%, 22%) !important; }
+
+/* Hover states */
+.dark .hover\:bg-slate-50:hover  { background-color: hsl(220, 15%, 18%) !important; }
+.dark .hover\:bg-gray-100:hover  { background-color: hsl(220, 15%, 18%) !important; }
+.dark .hover\:bg-gray-50:hover   { background-color: hsl(220, 15%, 16%) !important; }
+
+/* Inputs & textareas with hardcoded bg */
+.dark input.bg-white,
+.dark input.bg-slate-50,
+.dark textarea.bg-white,
+.dark textarea.border-slate-200 {
+  background-color: hsl(220, 15%, 18%) !important;
+  color: hsl(40, 20%, 92%) !important;
+  border-color: hsl(220, 15%, 28%) !important;
+}
+
+/* Native select */
+.dark select {
+  background-color: hsl(220, 15%, 18%) !important;
+  color: hsl(40, 20%, 92%) !important;
+  border-color: hsl(220, 15%, 28%) !important;
+}
+
+/* Info/tip boxes */
+.dark .bg-blue-50        { background-color: hsl(213, 40%, 14%) !important; }
+.dark .border-blue-100   { border-color: hsl(213, 40%, 22%) !important; }
+.dark .text-blue-700     { color: hsl(213, 70%, 70%) !important; }
+.dark .bg-blue-100       { background-color: hsl(213, 40%, 18%) !important; }
+.dark .text-blue-800     { color: hsl(213, 70%, 75%) !important; }
+.dark .bg-blue-200       { background-color: hsl(213, 40%, 22%) !important; }
+
+/* Scrollbars */
+.dark ::-webkit-scrollbar-track { background: hsl(220, 15%, 12%); }
+.dark ::-webkit-scrollbar-thumb { background: hsl(220, 15%, 28%); border-radius: 4px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: hsl(220, 15%, 35%); }
+
+@layer utilities {
+
+  .text-maroon {
+    color: #1A4332;
+  }
+
+  .bg-maroon {
+    background-color: #1A4332;
+  }
+
+  .border-maroon {
+    border-color: #1A4332;
+  }
+
+  .hover\:bg-maroon-dark:hover {
+    background-color: #133225;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  @keyframes blink-pink {
+    0%, 100% { border-color: transparent; }
+    50% { border-color: #ec4899; } /* Pink-500 */
+  }
+
+  .analyzed-image-blink {
+    animation: blink-pink 1.5s infinite;
+    border-color: #ec4899;
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.3);
+  }
+}
+
+/* A4 Sheet Standards & Print Styles */
+.a4-preview-wrapper {
+  background-color: #f3f4f6;
+  /* Gray-100 */
+  padding: 2rem 1rem;
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3rem;
+  /* Increased gap for better page separation */
+  min-height: calc(100vh - 200px);
+}
+
+.a4-container {
+  width: 210mm;
+  min-height: 297mm;
+  max-height: 297mm;
+  padding: 10mm;
+  /* Reduced from 20mm */
+  margin: 0 auto 3rem auto;
+  background: white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #e1e4e8;
+  /* Visual page separator in preview */
+}
+
+.a4-page-content {
+  flex: 1;
+  overflow: visible;
+  min-height: 0;
+}
+
+.a4-content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 40px;
+  /* Space for footer */
+}
+
+@media screen {
+  .a4-content-wrapper {
+    /* Allow scrolling in preview mode */
+    overflow-y: visible;
+  }
+
+  .a4-container {
+    /* Remove max-height in preview to show all content */
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  body {
+    background: white !important;
+    margin: 0;
+    padding: 0;
+  }
+
+  .min-h-screen {
+    min-height: auto !important;
+  }
+
+  /* Hide everything except the print container */
+  body>*:not(#printable-quote-root) {
+    display: none !important;
+  }
+
+  #printable-quote-root {
+    display: block !important;
+    width: 210mm;
+    margin: 0;
+    padding: 0;
+  }
+
+  .a4-container {
+    box-shadow: none;
+    margin: 0;
+    /* Remove margin in print */
+    width: 210mm;
+    min-height: 297mm;
+    max-height: 297mm;
+    padding: 7.5mm;
+    /* Reduced from 15mm */
+    padding-bottom: 15mm;
+    /* Adjusted for footer - reduced from 25mm */
+    page-break-after: always;
+    page-break-inside: avoid;
+    float: none;
+    overflow: hidden;
+    border: none;
+    /* Remove visual separator in print */
+  }
+
+  .a4-container:last-child {
+    page-break-after: auto;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Prevent awkward breaks */
+  table {
+    page-break-inside: auto;
+  }
+
+  table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  h2,
+  h3,
+  .font-bold {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* Ensure content wrapper doesn't overflow in print */
+  .a4-content-wrapper {
+    overflow: hidden;
+    max-height: calc(297mm - 40mm);
+    /* Account for padding and footer */
+  }
+}
+
+/* A4 Page Footer */
+.a4-page-footer {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+@media print {
+  .a4-page-footer {
+    position: absolute;
+    bottom: 5mm;
+    /* Reduced from 10mm to match reduced padding */
+    left: 7.5mm;
+    /* Reduced from 15mm */
+    right: 7.5mm;
+    /* Reduced from 15mm */
+    margin-top: 0;
+  }
+}
