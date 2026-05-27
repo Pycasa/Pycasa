@@ -39,6 +39,12 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Set release version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          # Strip leading 'v' (v1.2.3 → 1.2.3)
+          mvn versions:set -B -DnewVersion="${VERSION#v}" -DgenerateBackupPoms=false
+
       - name: Build uber-jar
         run: mvn clean package -B -DskipTests
 
@@ -135,7 +141,8 @@ jobs:
 
             Pull the image for this release:
             ```
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin;\
+              docker run -d -p 3000:3000 -v ~/Pictures:/photos ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
             ```
 
             ## JAR

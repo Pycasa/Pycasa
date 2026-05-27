@@ -32,6 +32,26 @@ Pycasa is a self-hosted photo management application that runs entirely on your 
 
 ## Quick Start
 
+### One-liner install (requires Java 17+)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/amithkoujalgi/Pycasa/main/install.sh | bash
+```
+
+The script downloads the latest release JAR to `~/.pycasa/`, installs a `pycasa` launcher to `/usr/local/bin`, and prints the URL to open.
+
+```bash
+pycasa                  # starts on default port 3000
+pycasa --port 8080      # starts on a custom port
+```
+
+Or run directly with Java:
+
+```bash
+java -jar ~/.pycasa/pycasa.jar
+java -Dquarkus.http.port=8080 -jar ~/.pycasa/pycasa.jar
+```
+
 ### Prerequisites
 
 | Tool | Version |
@@ -53,7 +73,7 @@ Opens at **http://localhost:3000** — UI hot-reloads on file save, Java reloads
 
 ```bash
 make build
-java -jar target/pycasa-server-1.0.0-SNAPSHOT-runner.jar
+java -jar target/pycasa-server-*-runner.jar
 ```
 
 The jar includes the full UI. No separate web server needed.
