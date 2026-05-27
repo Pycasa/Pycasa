@@ -58,3 +58,17 @@ check: ## Verify required tools are installed
 		{ echo "Error: Node.js is not installed."; exit 1; }
 	@command -v npm >/dev/null 2>&1 || \
 		{ echo "Error: npm is not installed."; exit 1; }
+
+build-docs:
+	@echo "Building docs artifacts..."
+	cd docs && [ -d node_modules ] || npm install
+	cd docs && npm run build
+
+clean-docs:
+	@echo "Cleaning docs artifacts..."
+	rm -rf docs/dist
+
+docs-serve: clean-docs
+	@echo "Starting docs development server..."
+	cd docs && [ -d node_modules ] || npm install
+	cd docs && npm run dev

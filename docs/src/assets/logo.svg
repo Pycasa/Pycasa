@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <clipPath id="cc">
+      <circle cx="100" cy="100" r="94"/>
+    </clipPath>
+    <!--
+      One blade template: a curved wedge that sits at the top of the circle,
+      offset so its inner tip points toward center-left, creating the iris twist.
+      The blade covers roughly 80° of arc on the outer rim, with the inner
+      edge angled to create the characteristic shutter look.
+    -->
+    <path id="blade"
+      d="M100,100
+         L 62, 12
+         A 90,90 0 0,1 138,12
+         Z"
+    />
+  </defs>
+
+  <!-- Black background -->
+  <circle cx="100" cy="100" r="100" fill="#000"/>
+
+  <g clip-path="url(#cc)">
+    <!-- 8 blades, each rotated 45° more, with a slight extra twist offset -->
+    <!-- Blade 1 — Pink -->
+    <use href="#blade" fill="#E91E8C" stroke="#000" stroke-width="3.5"
+         transform="rotate(0 100 100) translate(8,-4) rotate(-12 100 100)"/>
+    <!-- Blade 2 — Red -->
+    <use href="#blade" fill="#E53935" stroke="#000" stroke-width="3.5"
+         transform="rotate(45 100 100) translate(8,-4) rotate(-12 100 100)"/>
+    <!-- Blade 3 — Orange -->
+    <use href="#blade" fill="#F57C00" stroke="#000" stroke-width="3.5"
+         transform="rotate(90 100 100) translate(8,-4) rotate(-12 100 100)"/>
+    <!-- Blade 4 — Yellow -->
+    <use href="#blade" fill="#FDD835" stroke="#000" stroke-width="3.5"
+         transform="rotate(135 100 100) translate(8,-4) rotate(-12 100 100)"/>
+    <!-- Blade 5 — Green -->
+    <use href="#blade" fill="#43A047" stroke="#000" stroke-width="3.5"
+         transform="rotate(180 100 100) translate(8,-4) rotate(-12 100 100)"/>
+    <!-- Blade 6 — Cyan -->
+    <use href="#blade" fill="#00ACC1" stroke="#000" stroke-width="3.5"
+         transform="rotate(225 100 100) translate(8,-4) rotate(-12 100 100)"/>
+    <!-- Blade 7 — Blue -->
+    <use href="#blade" fill="#1E88E5" stroke="#000" stroke-width="3.5"
+         transform="rotate(270 100 100) translate(8,-4) rotate(-12 100 100)"/>
+    <!-- Blade 8 — Purple -->
+    <use href="#blade" fill="#8E24AA" stroke="#000" stroke-width="3.5"
+         transform="rotate(315 100 100) translate(8,-4) rotate(-12 100 100)"/>
+  </g>
+
+  <!-- Center aperture hole -->
+  <circle cx="100" cy="100" r="26" fill="#000"/>
+</svg>

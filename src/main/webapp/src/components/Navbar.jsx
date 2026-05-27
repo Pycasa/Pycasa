@@ -181,7 +181,7 @@ const Navbar = ({ isAuthenticated, onLogout, username, activeTab }) => {
 
                 {/* GitHub */}
                 <a
-                  href="https://github.com/amithkoujalgi/Pycasa"
+                  href="https://github.com/pycasa/pycasa"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center w-9 h-9 rounded-lg text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
@@ -293,7 +293,7 @@ const Navbar = ({ isAuthenticated, onLogout, username, activeTab }) => {
                     <span className="font-medium">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
                   </button>
                   <a
-                    href="https://github.com/amithkoujalgi/Pycasa"
+                    href="https://github.com/pycasa/pycasa"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center space-x-3 py-3 px-4 rounded-lg transition-colors text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
