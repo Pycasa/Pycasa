@@ -35,7 +35,18 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Verify versions
+        run: |
+          java -version
+          mvn -version
+          node -v
+          npm -v
+
+      - name: Install frontend dependencies
+        run: npm ci
 
       - name: Build uber-jar
         run: mvn clean package -B
