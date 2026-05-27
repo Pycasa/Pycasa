@@ -103,7 +103,7 @@ const installCommands = {
     cmd: 'java -jar pycasa-server-runner.jar',
   },
   docker: {
-    comment: '# Run with Docker. Get your token from GitHub.',
+    comment: '# Run with Docker. Get your GitHub token from https://github.com/settings/tokens',
     cmd: 'echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin; docker run -d -p 3000:3000 -v ~/Pictures:/photos --name pycasa pycasa/pycasa:latest',
   },
   build: {
