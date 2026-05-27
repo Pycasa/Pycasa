@@ -102,9 +102,12 @@ const installCommands = {
     comment: '# One-liner install — requires Java 17+',
     cmd: 'curl -fsSL https://raw.githubusercontent.com/Pycasa/Pycasa/main/install.sh | bash',
   },
+  // gh_docker: {
+  //   comment: '# Run with Docker. Get your GitHub token from https://github.com/settings/tokens',
+  //   cmd: 'echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin; docker run -d -p 8080:8080 -v ~/Pictures:/photos --name pycasa ghcr.io/Pycasa/pycasa:latest',
+  // },
   docker: {
-    comment: '# Run with Docker. Get your GitHub token from https://github.com/settings/tokens',
-    cmd: 'echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin; docker run -d -p 8080:8080 -v ~/Pictures:/photos --name pycasa ghcr.io/Pycasa/pycasa:latest',
+    cmd: 'docker run -d -p 8080:8080 -v ~/Pictures:/photos pycasa/pycasa:latest'
   },
   build: {
     comment: '# Build from source',
