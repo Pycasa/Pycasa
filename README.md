@@ -1,6 +1,12 @@
-# Pycasa
+<div align="center">
+   <img width="150" height="150" alt="logo-no-bg" src="https://github.com/user-attachments/assets/c73be700-2369-4ead-9875-b27a5a68a5cb" />
 
+### Pycasa
 **Your photos, your server, your rules.**
+
+</div>
+
+
 
 Pycasa is a self-hosted photo management application that runs entirely on your own machine. No cloud subscriptions, no data leaving your network. Point it at your photo folders and get a fast, searchable gallery with AI-powered descriptions, tags, and OCR — all processed locally.
 
