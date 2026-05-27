@@ -45,11 +45,11 @@ jobs:
           node -v
           npm -v
 
-      # IMPORTANT:
-      # Use npm install because package-lock.json does not exist
-      - name: Install frontend dependencies
-        run: npm install
+      # OPTIONAL DEBUG
+      - name: Show repository structure
+        run: ls -R
 
+      # Build backend only
       - name: Build uber-jar
         run: mvn clean package -B
 
