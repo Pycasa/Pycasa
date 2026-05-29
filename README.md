@@ -10,7 +10,13 @@
 
 Pycasa is a self-hosted photo management application that runs entirely on your own machine. No cloud subscriptions, no data leaving your network. Point it at your photo folders and get a fast, searchable gallery with AI-powered descriptions, tags, and OCR — all processed locally.
 
-![Gallery view](screenshots/pycasa1.png)
+<div align="center">
+   <img height="400" alt="timeline-light" src="https://github.com/user-attachments/assets/4bbd8b40-66de-4ac8-98d0-cbf7f8c33b55" />
+</div>
+
+<div align="center">
+   <a href="https://www.producthunt.com/products/pycasa?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-pycasa" target="_blank" rel="noopener noreferrer"><img alt="Pycasa - A self-hosted modern AI photo manager | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1157300&amp;theme=light&amp;t=1780043143447"></a>
+</div>
 
 ---
 
@@ -25,8 +31,14 @@ Pycasa is a self-hosted photo management application that runs entirely on your 
 - **Embedded database** — uses [Couchbase Lite](https://www.couchbase.com/products/lite/) — no external database to install or manage
 - **Single binary** — ships as a self-contained jar with the UI bundled inside
 
-![Timeline view](screenshots/pycasa2.png)
-![AI tags](screenshots/pycasa3.png)
+<div align="center">
+   <img height="400" alt="ai-service-select" src="https://github.com/user-attachments/assets/a4d3e44f-fdcc-48eb-b671-fd069074e7dc" />
+   <img height="400" alt="ai-service-ollama" src="https://github.com/user-attachments/assets/19a65b15-6a61-44c8-8064-b58eecf51b10" />
+   <img height="400" alt="ai-analysis-image-preview" src="https://github.com/user-attachments/assets/fb4cf2d4-6645-4079-aa92-f8e0c33ce622" />
+   <img height="400" alt="notifications" src="https://github.com/user-attachments/assets/982d5265-eee0-4c0a-b6d9-95f11c5ca09d" />
+   <img height="400" alt="settings-ocr" src="https://github.com/user-attachments/assets/d853842b-9a54-4259-88ae-59effc13ec7c" />
+   <img height="400" alt="timeline-dark" src="https://github.com/user-attachments/assets/de0331e2-b525-4ee1-b104-d03eeff9d19a" />
+</div>
 
 ---
 
