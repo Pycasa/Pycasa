@@ -180,6 +180,14 @@ nav.scrolled {
   transition: all 0.2s;
 }
 .btn-secondary:hover { border-color: var(--border-h); color: var(--accent-l); }
+.btn-ph {
+  display: inline-flex; align-items: center;
+  border-radius: 10px; overflow: hidden;
+  transition: opacity 0.2s, transform 0.2s;
+  line-height: 0;
+}
+.btn-ph img { height: 47px; width: auto; display: block; }
+.btn-ph:hover { opacity: 0.88; transform: translateY(-1px); }
 .hero-pills {
   display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
 }
@@ -615,6 +623,9 @@ footer {
 }
 @media (max-width: 640px) {
   .hero-ctas { flex-direction: column; align-items: stretch; max-width: 320px; margin: 0 auto 36px; }
+  .hero-ctas .btn-primary,
+  .hero-ctas .btn-secondary { justify-content: center; }
+  .hero-ctas .btn-ph { justify-content: center; }
   .terminal-tabs { display: none; }
   .stack-grid { grid-template-columns: 1fr; }
   .features-grid { grid-template-columns: 1fr; }

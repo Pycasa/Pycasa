@@ -292,6 +292,19 @@ export default function App() {
           >
             <GithubIcon /> Star on GitHub
           </a>
+          <a
+            href="https://www.producthunt.com/products/pycasa?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-pycasa"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-ph"
+          >
+            <img
+              alt="Pycasa - A self-hosted modern AI photo manager | Product Hunt"
+              width="250"
+              height="54"
+              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1157300&amp;theme=neutral&amp;t=1780044878636"
+            />
+          </a>
         </div>
         <div className="hero-pills">
           <span className="pill">🔒 100% Private</span>
