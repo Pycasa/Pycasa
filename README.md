@@ -14,6 +14,10 @@ Pycasa is a self-hosted photo management application that runs entirely on your 
    <img height="400" alt="timeline-light" src="https://github.com/user-attachments/assets/4bbd8b40-66de-4ac8-98d0-cbf7f8c33b55" />
 </div>
 
+<div align="center">
+   <a href="https://www.producthunt.com/products/pycasa?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-pycasa" target="_blank" rel="noopener noreferrer"><img alt="Pycasa - A self-hosted modern AI photo manager | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1157300&amp;theme=light&amp;t=1780043143447"></a>
+</div>
+
 ---
 
 ## Features
