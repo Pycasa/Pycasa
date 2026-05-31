@@ -288,7 +288,7 @@ const ImageDetailModal = ({ image, isOpen, onClose, onUpdate, onNext, onPrevious
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-6xl h-[98vh] flex flex-col p-0 gap-0 overflow-hidden">
+            <DialogContent hideClose className="max-w-6xl h-[98vh] flex flex-col p-0 gap-0 overflow-hidden">
                 {/* Header (Hidden mostly but good for accessibility/structure) */}
                 <DialogHeader className="sr-only">
                     <DialogTitle>{image.name}</DialogTitle>
@@ -392,130 +392,123 @@ const ImageDetailModal = ({ image, isOpen, onClose, onUpdate, onNext, onPrevious
 
                 {/* Bottom Details Section */}
                 {showDetails && (
-                    <div className="bg-white border-t border-slate-200">
-                        {/* Minimal Metadata Bar */}
-                        <div className="flex items-center gap-6 px-4 py-2 bg-slate-50/50 border-b border-slate-100 text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                            <div className="flex items-center gap-2 group truncate w-full">
-                                <FolderIcon className="w-3 h-3" />
-                                <span className="truncate">{image.full_path}</span>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                    <div className="bg-card border-t border-border flex flex-col shrink-0">
+                        {/* File info strip */}
+                        <div className="flex items-center gap-4 px-5 py-2 bg-muted/40 border-b border-border">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1 group">
+                                <FolderIcon className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground truncate font-mono">{image.full_path}</span>
+                                <button
+                                    className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
                                     onClick={handleCopyPath}
+                                    title="Copy path"
                                 >
-                                    <Clipboard className="w-3 h-3" />
-                                </Button>
+                                    <Clipboard className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-4 shrink-0 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1.5">
+                                    <HardDrive className="w-3.5 h-3.5" />
+                                    {formatFileSize(image.size)}
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <ImageIcon className="w-3.5 h-3.5" />
+                                    {dimensions.width > 0 ? `${dimensions.width} × ${dimensions.height}` : '—'}
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    {new Date(image.modified).toLocaleDateString()}
+                                </span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-6 px-4 py-2 bg-slate-50/50 border-b border-slate-100 text-[10px] text-slate-400 uppercase tracking-widest font-bold">
 
-                            <div className="flex items-center gap-2">
-                                <HardDrive className="w-3 h-3" />
-                                <span>{formatFileSize(image.size)}</span>
+                        {/* Editable fields + actions */}
+                        <div className="flex divide-x divide-border h-[170px]">
+                            {/* Description */}
+                            <div className="flex-1 p-4 flex flex-col gap-2 min-h-0">
+                                <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground shrink-0">
+                                    <Info className="w-3.5 h-3.5" />
+                                    Description
+                                </label>
+                                <Textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    className="resize-none text-sm flex-1 min-h-0 border-border rounded-lg bg-muted/40 focus:bg-background focus:border-ring focus:ring-0 transition-colors placeholder:text-muted-foreground/50"
+                                    placeholder="Add a description…"
+                                />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <ImageIcon className="w-3 h-3" />
-                                <span>{dimensions.width} &times; {dimensions.height} px</span>
-                            </div>
-                            <div className="flex items-center gap-2 ml-auto">
-                                <Calendar className="w-3 h-3" />
-                                <span>{new Date(image.modified).toLocaleDateString()}</span>
-                            </div>
-                        </div>
-                        <div className="p-4 space-y-4">
-                            <div className="grid grid-cols-2 gap-8">
-                                {/* Description */}
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                                        <Info className="w-3 h-3" />
-                                        Description
-                                    </label>
-                                    <Textarea
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        className="resize-none text-xs min-h-[100px] border-slate-200 focus:border-slate-400 focus:ring-0 transition-colors"
-                                        placeholder="Add a detailed description..."
+
+                            {/* Tags */}
+                            <div className="flex-1 p-4 flex flex-col gap-2 min-h-0">
+                                <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground shrink-0">
+                                    <Tag className="w-3.5 h-3.5" />
+                                    Tags
+                                </label>
+                                <form onSubmit={handleAddTag} className="flex gap-2 shrink-0">
+                                    <Input
+                                        value={newTag}
+                                        onChange={(e) => setNewTag(e.target.value)}
+                                        placeholder="Type a tag and press enter…"
+                                        className="h-8 text-sm border-border bg-muted/40 focus:bg-background focus:border-ring focus:ring-0 transition-colors placeholder:text-muted-foreground/50"
                                     />
-                                </div>
-
-                                {/* Tags */}
-                                <div className="space-y-2 flex flex-col h-full">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                                        <Tag className="w-3 h-3" />
-                                        Tags
-                                    </label>
-                                    <div className="space-y-2 flex-grow flex flex-col">
-                                        <form onSubmit={handleAddTag} className="flex gap-2">
-                                            <Input
-                                                value={newTag}
-                                                onChange={(e) => setNewTag(e.target.value)}
-                                                placeholder="Add tag..."
-                                                className="h-8 text-xs border-slate-200 focus:border-slate-400 focus:ring-0 transition-colors"
-                                            />
-                                            <Button type="submit" size="sm" variant="secondary" className="h-8 w-8 p-0 bg-slate-100 hover:bg-slate-200 text-slate-600">
-                                                <Plus className="w-4 h-4" />
-                                            </Button>
-                                        </form>
-                                        <div className="flex flex-wrap gap-1.5 content-start bg-slate-50/50 rounded-lg p-3 flex-grow border border-slate-100/50 min-h-[60px] max-h-[100px] overflow-y-auto">
-                                            {tags.map(tag => (
-                                                <Badge key={tag} variant="secondary" className="pl-2 pr-1 h-6 gap-1 text-[10px] font-medium bg-white border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
-                                                    {tag}
-                                                    <X
-                                                        className="w-3 h-3 cursor-pointer hover:text-red-500 transition-colors"
-                                                        onClick={() => removeTag(tag)}
-                                                    />
-                                                </Badge>
-                                            ))}
-                                            {tags.length === 0 && (
-                                                <div className="flex items-center justify-center w-full h-full text-[10px] text-slate-400 italic">
-                                                    No tags yet
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <Button type="submit" size="sm" variant="outline" className="h-8 w-8 p-0 shrink-0">
+                                        <Plus className="w-4 h-4" />
+                                    </Button>
+                                </form>
+                                <div className="flex flex-wrap gap-1.5 content-start rounded-lg p-2 border border-border bg-muted/40 flex-1 overflow-y-auto min-h-0">
+                                    {tags.map(tag => (
+                                        <Badge key={tag} variant="secondary" className="pl-2.5 pr-1.5 h-6 gap-1 text-xs font-normal shadow-none">
+                                            {tag}
+                                            <button onClick={() => removeTag(tag)} className="text-muted-foreground hover:text-destructive transition-colors">
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {tags.length === 0 && (
+                                        <span className="text-xs text-muted-foreground/50 italic self-center mx-auto">No tags yet</span>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Actions Row */}
-                            <div className="flex items-center justify-center gap-4 pt-2">
+                            {/* Actions */}
+                            <div className="flex flex-col justify-center gap-2 px-5 py-4 shrink-0">
                                 <Button
                                     onClick={handleAnalyse}
                                     disabled={isAnalysing}
                                     variant="outline"
-                                    className="h-9 px-8 text-xs font-bold uppercase tracking-widest bg-gradient-to-r from-pink-50 to-pink-100 hover:from-pink-100 hover:to-pink-100 border-pink-100 text-pink-700 transition-all active:scale-95 disabled:opacity-50"
+                                    size="sm"
+                                    className="modal-btn-ai w-36 justify-start gap-2 text-xs disabled:opacity-50"
                                 >
-                                    <Sparkles className={`w-3.5 h-3.5 mr-2 ${isAnalysing ? 'animate-spin' : ''}`} />
-                                    {isAnalysing ? 'Analysing...' : 'AI Analyse'}
+                                    <Sparkles className={`w-3.5 h-3.5 shrink-0 ${isAnalysing ? 'animate-spin' : ''}`} />
+                                    {isAnalysing ? 'Analysing…' : 'AI Analyse'}
                                 </Button>
-
                                 <Button
                                     onClick={handleOCR}
                                     disabled={isRunningOCR}
                                     variant="outline"
-                                    className="h-9 px-8 text-xs font-bold uppercase tracking-widest bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-100 border-orange-100 text-orange-700 transition-all active:scale-95 disabled:opacity-50"
+                                    size="sm"
+                                    className="modal-btn-ocr w-36 justify-start gap-2 text-xs disabled:opacity-50"
                                 >
-                                    <ScanText className={`w-3.5 h-3.5 mr-2 ${isRunningOCR ? 'animate-pulse' : ''}`} />
-                                    {isRunningOCR ? 'Scanning...' : 'OCR'}
+                                    <ScanText className={`w-3.5 h-3.5 shrink-0 ${isRunningOCR ? 'animate-pulse' : ''}`} />
+                                    {isRunningOCR ? 'Scanning…' : 'OCR'}
                                 </Button>
-
                                 <Button
                                     onClick={handleSave}
                                     disabled={isSaving}
-                                    className="h-9 px-8 text-xs font-bold uppercase tracking-widest bg-green-900 hover:bg-green-600 text-white transition-all active:scale-95 disabled:opacity-50"
+                                    size="sm"
+                                    className="modal-btn-save w-36 justify-start gap-2 text-xs disabled:opacity-50"
                                 >
-                                    <Save className="w-3.5 h-3.5 mr-2" />
-                                    {isSaving ? 'Saving...' : 'Save'}
+                                    <Save className="w-3.5 h-3.5 shrink-0" />
+                                    {isSaving ? 'Saving…' : 'Save'}
                                 </Button>
-
-                                <div className="w-px h-6 bg-slate-200 mx-2" />
-
+                                <div className="h-px bg-border my-0.5" />
                                 <Button
                                     variant="ghost"
                                     onClick={handleDelete}
-                                    className="h-9 px-4 text-xs font-bold uppercase tracking-widest text-red-500 hover:text-red-600 hover:bg-red-50 transition-all active:scale-95"
+                                    size="sm"
+                                    className="w-36 justify-start gap-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                                 >
-                                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
                                     Delete
                                 </Button>
                             </div>

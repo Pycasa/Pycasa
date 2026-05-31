@@ -66,6 +66,59 @@
 }
 
 /* ============================================================
+   IMAGE DETAIL MODAL — THEMED ACTION BUTTONS
+   Uses CSS variables so they adapt to light/dark automatically.
+   ============================================================ */
+
+.modal-btn-ai {
+  background-color: hsl(330 60% 96%);
+  border-color: hsl(330 50% 85%);
+  color: hsl(330 60% 40%);
+}
+.modal-btn-ai:hover {
+  background-color: hsl(330 60% 92%);
+  border-color: hsl(330 50% 75%);
+}
+
+.modal-btn-ocr {
+  background-color: hsl(30 80% 96%);
+  border-color: hsl(30 70% 82%);
+  color: hsl(25 70% 38%);
+}
+.modal-btn-ocr:hover {
+  background-color: hsl(30 80% 92%);
+  border-color: hsl(30 70% 72%);
+}
+
+.modal-btn-save {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+.modal-btn-save:hover {
+  background-color: hsl(var(--primary) / 0.85);
+}
+
+.dark .modal-btn-ai {
+  background-color: hsl(330 30% 18%);
+  border-color: hsl(330 30% 28%);
+  color: hsl(330 60% 75%);
+}
+.dark .modal-btn-ai:hover {
+  background-color: hsl(330 30% 22%);
+  border-color: hsl(330 30% 35%);
+}
+
+.dark .modal-btn-ocr {
+  background-color: hsl(25 30% 18%);
+  border-color: hsl(25 30% 28%);
+  color: hsl(30 70% 72%);
+}
+.dark .modal-btn-ocr:hover {
+  background-color: hsl(25 30% 22%);
+  border-color: hsl(25 30% 35%);
+}
+
+/* ============================================================
    DARK MODE OVERRIDES
    Covers all hardcoded Tailwind bg/text/border classes used
    throughout the app without needing to touch every JSX file.
