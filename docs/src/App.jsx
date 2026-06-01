@@ -495,7 +495,7 @@ export default function App() {
         </div>
 
         <div className="prereqs">
-          <h3>Prerequisites</h3>
+          <h3>Development - Prerequisites</h3>
           <div className="prereq-grid">
             {[
               { name: 'Java', version: '17+', required: true },
@@ -518,46 +518,6 @@ export default function App() {
             <strong>Default login:</strong> username <code>admin</code> · password <code>admin</code>
             <span className="creds-note"></span>
           </div>
-        </div>
-      </section>
-
-      {/* ── API REFERENCE ── */}
-      <section className="section-api">
-        <h2 className="section-title">REST API</h2>
-        <p className="section-sub">
-          Full Swagger UI available at <code>/docs</code> when the server is running.
-        </p>
-        <div className="api-table-wrap">
-          <table className="api-table">
-            <thead>
-              <tr>
-                <th>Method</th>
-                <th>Path</th>
-                <th>Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['GET', '/api/health', 'Health check'],
-                ['POST', '/api/auth/login', 'Login'],
-                ['GET', '/api/folders', 'List monitored folders'],
-                ['POST', '/api/folders', 'Add a folder'],
-                ['GET', '/api/images', 'List images (paginated, filterable)'],
-                ['POST', '/api/images/scan', 'Trigger a folder scan'],
-                ['GET', '/api/images/tags', 'List all AI-generated tags'],
-                ['POST', '/api/ai/batch-analyse', 'Run AI analysis on all images'],
-                ['GET', '/api/ai/analysis-status', 'AI analysis progress'],
-                ['GET', '/api/settings', 'Get app settings'],
-                ['POST', '/api/settings', 'Update settings'],
-              ].map(([method, path, desc]) => (
-                <tr key={path}>
-                  <td><span className={`method method-${method.toLowerCase()}`}>{method}</span></td>
-                  <td><code>{path}</code></td>
-                  <td>{desc}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </section>
 
