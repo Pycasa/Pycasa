@@ -11,54 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate-build:
-    name: Validate Build
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Find and Replace
-        uses: jacobtomlinson/gha-find-replace@v3
-        with:
-          find: "pycasa-revision"
-          replace: ${{ github.ref_name }}
-          regex: false
-          
-      - name: Verify installed tools
-        run: |
-          java -version
-          mvn -version
-          node -v
-          npm -v
-
-      # OPTIONAL DEBUG
-      - name: Show repository structure
-        run: ls -R
-
-      # Build backend only
-      - name: Build uber-jar
-        run: mvn clean package -B
-
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pycasa-runner
-          path: target/*-runner.jar
-          retention-days: 30
+  build:
+    name: Build
+    uses: ./.github/workflows/maven-build.yml
+    with:
+      version: ${{ github.sha }}
+      skip-tests: false
+      retention-days: 30

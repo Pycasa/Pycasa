@@ -10,16 +10,25 @@ on:
     paths:
       - 'apps/windows/**'
   workflow_dispatch:
-  workflow_call:   # allows release.yml to call this as a reusable workflow
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  build-jar:
+    name: Build Uber-JAR
+    uses: ./.github/workflows/maven-build.yml
+    with:
+      version: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || (github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha) }}
+      skip-tests: true
+      retention-days: 14
+
   build-windows-installer:
     name: Build Pycasa Installer
     runs-on: windows-latest
+    needs: build-jar
 
     permissions:
       contents: write
@@ -32,41 +41,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - name: Download server JAR artifact
+        uses: actions/download-artifact@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
+          name: pycasa-runner
+          path: jar-download/
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Find and Replace
-        uses: jacobtomlinson/gha-find-replace@v3
-        with:
-          find: "pycasa-revision"
-          replace: ${{ github.ref_name }}
-          regex: false
-
-      - name: Build uber-jar
-        run: mvn clean package -B -DskipTests
-        working-directory: ${{ github.workspace }}
-
-      - name: Copy JAR to apps/windows
+      - name: Move JAR into apps/windows/ (flatten)
         shell: pwsh
         run: |
-          Copy-Item "${{ github.workspace }}/target/*-runner.jar" -Destination "${{ github.workspace }}/apps/windows/"
+          $jar = Get-ChildItem -Path "${{ github.workspace }}/jar-download" -Recurse -Filter "*runner.jar" | Select-Object -First 1
+          if (!$jar) { Write-Error "JAR not found in artifact"; exit 1 }
+          Copy-Item $jar.FullName -Destination "${{ github.workspace }}/apps/windows/$($jar.Name)"
+          Write-Host "JAR ready: $($jar.Name)"
+        working-directory: ${{ github.workspace }}
 
       - name: Resolve version
         id: version
         shell: pwsh
         run: |
           $v = "${{ github.ref_name }}"
+          # Check if we should use commit hash (for autobuilds, PRs etc)
+          $isTag = $v -match '^v?[0-9]+\.[0-9]+'
+          if (-not $isTag) {
+              $v = "${{ needs.build-jar.outputs.version }}"
+          }
           if (-not $v -or $v -eq "") { $v = "dev" }
-          # Sanitize: replace chars invalid in filenames (/, \, :, *, ?, ", <, >, |)
+          # Sanitize: replace chars invalid in Windows filenames
           $v = $v -replace '[/\\:*?"<>|]', '-'
           Write-Host "Version: $v"
           "value=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
@@ -109,13 +110,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed"; exit 1 }
           $installer = Get-Item "dist\PycasaSetup-${version}.exe"
           Write-Host "$($installer.Name) -- $([math]::Round($installer.Length/1MB,2)) MB"
-
-      # - name: Upload Pycasa.exe artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Pycasa-windows-exe
-      #     path: apps/windows/Pycasa.exe
-      #     retention-days: 14
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
