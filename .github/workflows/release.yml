@@ -39,6 +39,13 @@ jobs:
         with:
           node-version: '20'
 
+      # - name: Find and Replace
+      #   uses: jacobtomlinson/gha-find-replace@v3
+      #   with:
+      #     find: "pycasa-revision"
+      #     replace: ${{ github.ref_name }}
+      #     regex: false
+
       - name: Set release version
         run: |
           VERSION="${{ github.ref_name }}"

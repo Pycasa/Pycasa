@@ -44,6 +44,13 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Find and Replace
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: "pycasa-revision"
+          replace: ${{ github.ref_name }}
+          regex: false
+
       - name: Build uber-jar
         run: mvn clean package -B -DskipTests
         working-directory: ${{ github.workspace }}
@@ -103,12 +110,12 @@ jobs:
           $installer = Get-Item "dist\PycasaSetup-${version}.exe"
           Write-Host "$($installer.Name) -- $([math]::Round($installer.Length/1MB,2)) MB"
 
-      - name: Upload Pycasa.exe artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Pycasa-windows-exe
-          path: apps/windows/Pycasa.exe
-          retention-days: 14
+      # - name: Upload Pycasa.exe artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: Pycasa-windows-exe
+      #     path: apps/windows/Pycasa.exe
+      #     retention-days: 14
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
