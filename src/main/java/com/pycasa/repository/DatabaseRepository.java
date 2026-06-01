@@ -57,9 +57,17 @@ public class DatabaseRepository {
     @PostConstruct
     void init() {
         try {
-            CouchbaseLite.init();
             String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
-            new File(dir).mkdirs();
+            File dbDir = new File(dir);
+            dbDir.mkdirs();
+            
+            // Create a dedicated scratch/temp directory for Couchbase Lite inside .pycasa
+            File scratchDir = new File(dbDir.getParentFile(), "temp");
+            scratchDir.mkdirs();
+            
+            // Initialize Couchbase Lite with explicit root and scratch paths (resolves UnsatisfiedLinkError and permissions issues)
+            CouchbaseLite.init(false, dbDir, scratchDir);
+            
             DatabaseConfiguration config = new DatabaseConfiguration();
             config.setDirectory(dir);
             database = new Database(dbName, config);
