@@ -135,10 +135,10 @@ jobs:
           name: pycasa-runner
           path: release-assets/
 
-      - name: Download Windows EXE artifact
+      - name: Download Windows installer artifact
         uses: actions/download-artifact@v4
         with:
-          name: Pycasa-windows-x64
+          name: Pycasa-windows-installer
           path: release-assets/
 
       - name: Rename JAR with version tag
@@ -155,7 +155,7 @@ jobs:
           generate_release_notes: true
           files: |
             release-assets/pycasa-${{ github.ref_name }}-runner.jar
-            release-assets/Pycasa.exe
+            release-assets/PycasaSetup.exe
           body: |
             ## Docker Image
 

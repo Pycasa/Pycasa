@@ -19,3 +19,6 @@ CouchbaseLiteTemp/
 
 # Generated Windows resource file (produced by rsrc during build)
 apps/windows/resource.syso
+
+# Inno Setup installer output
+apps/windows/dist/

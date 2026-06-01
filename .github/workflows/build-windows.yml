@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   build-windows-exe:
-    name: Build Pycasa.exe
+    name: Build Pycasa Installer
     runs-on: windows-latest
 
     permissions:
@@ -50,30 +50,44 @@ jobs:
         run: rsrc -ico favicon.ico -o resource.syso
 
       - name: Build Pycasa.exe
-        run: |
-          go build -ldflags "-H windowsgui -s -w" -o Pycasa.exe .
+        run: go build -ldflags "-H windowsgui -s -w" -o Pycasa.exe .
 
-      - name: Verify binary exists
+      - name: Verify Pycasa.exe
         run: |
-          if (!(Test-Path "Pycasa.exe")) {
-            Write-Error "Pycasa.exe was not created"
-            exit 1
-          }
-          $size = (Get-Item "Pycasa.exe").length / 1MB
-          Write-Host "Pycasa.exe built successfully ($([math]::Round($size, 2)) MB)"
+          if (!(Test-Path "Pycasa.exe")) { Write-Error "Pycasa.exe not found"; exit 1 }
+          $size = [math]::Round((Get-Item "Pycasa.exe").Length / 1MB, 2)
+          Write-Host "Pycasa.exe built successfully (${size} MB)"
 
-      # Upload as a workflow artifact on every push/PR so devs can download it
+      - name: Install Inno Setup 6
+        run: choco install innosetup --no-progress -y
+
+      - name: Build PycasaSetup.exe (installer)
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc pycasa.iss
+          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed"; exit 1 }
+          $size = [math]::Round((Get-Item "dist\PycasaSetup.exe").Length / 1MB, 2)
+          Write-Host "PycasaSetup.exe built successfully (${size} MB)"
+
+      # Upload both artifacts for every push/PR
       - name: Upload Pycasa.exe artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Pycasa-windows-x64
+          name: Pycasa-windows-exe
           path: apps/windows/Pycasa.exe
           retention-days: 14
 
-      # On release: attach Pycasa.exe directly to the GitHub Release
-      - name: Upload Pycasa.exe to GitHub Release
+      - name: Upload PycasaSetup.exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pycasa-windows-installer
+          path: apps/windows/dist/PycasaSetup.exe
+          retention-days: 14
+
+      # On release: attach the installer to the GitHub Release
+      - name: Upload installer to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/windows/Pycasa.exe
+          files: apps/windows/dist/PycasaSetup.exe
           tag_name: ${{ github.ref_name }}

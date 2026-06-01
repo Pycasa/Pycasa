@@ -15,7 +15,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [1/2] Fetching dependencies and tidying go.mod...
+echo [1/5] Fetching dependencies and tidying go.mod...
 go mod tidy
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to fetch Go dependencies.
@@ -24,7 +24,7 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-echo [2/3] Embedding app icon into executable...
+echo [2/5] Embedding app icon into executable...
 go install github.com/akavel/rsrc@latest
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install rsrc tool.
@@ -38,7 +38,7 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-echo [3/3] Compiling Pycasa.exe (with hidden console window and embedded icon)...
+echo [3/5] Compiling Pycasa.exe (with hidden console window and embedded icon)...
 go build -ldflags "-H windowsgui -s -w" -o Pycasa.exe .
 if %errorlevel% neq 0 (
     echo [ERROR] Go compilation failed.
@@ -47,7 +47,7 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-echo [3/3] Checking for Pycasa server JAR file...
+echo [4/5] Checking for Pycasa server JAR file...
 set "JAR_EXISTS=0"
 for %%f in (*runner.jar pycasa-*.jar) do (
     set "JAR_EXISTS=1"
@@ -61,13 +61,42 @@ if "!JAR_EXISTS!"=="1" (
     powershell -NoProfile -Command "$ProgressPreference = 'SilentlyContinue'; try { $r = Invoke-RestMethod -Uri 'https://api.github.com/repos/Pycasa/Pycasa/releases/latest'; $a = $r.assets | Where-Object { $_.name -like '*runner.jar' -or $_.name -like '*.jar' } | Select-Object -First 1; if ($a) { Write-Host ('Downloading latest server JAR: ' + $a.name + ' (' + [math]::round($a.size/1MB, 1) + ' MB)...'); Invoke-WebRequest -Uri $a.browser_download_url -OutFile $a.name; Write-Host 'Download complete' } else { throw 'No JAR asset found' } } catch { Write-Warning ('Failed to download from GitHub: ' + $_.Exception.Message) }"
 )
 
+echo [5/5] Building Windows installer (PycasaSetup.exe)...
+
+:: Look for ISCC.exe (Inno Setup compiler) in standard install locations
+set "ISCC="
+for %%p in (
+    "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+    "%ProgramFiles%\Inno Setup 6\ISCC.exe"
+    "%ProgramFiles(x86)%\Inno Setup 5\ISCC.exe"
+    "%ProgramFiles%\Inno Setup 5\ISCC.exe"
+) do (
+    if exist %%p set "ISCC=%%p"
+)
+
+if "!ISCC!"=="" (
+    echo [WARNING] Inno Setup not found. Skipping installer build.
+    echo           Download from https://jrsoftware.org/isdl.php to build the installer.
+    echo           The bare Pycasa.exe was still built successfully.
+) else (
+    echo Using Inno Setup compiler: !ISCC!
+    !ISCC! pycasa.iss
+    if !errorlevel! neq 0 (
+        echo [ERROR] Inno Setup compilation failed.
+        pause
+        exit /b !errorlevel!
+    )
+    echo [INFO] Installer created: dist\PycasaSetup.exe
+)
+
 echo.
 echo ===================================================
 echo [SUCCESS] Build completed successfully!
 echo.
-echo Generated executable: apps/windows/Pycasa.exe
+echo   Wrapper exe : apps/windows/Pycasa.exe
+echo   Installer   : apps/windows/dist/PycasaSetup.exe
 echo.
-echo To run: Double-click 'Pycasa.exe'
+echo Distribute 'PycasaSetup.exe' to end users.
 echo ===================================================
 echo.
 pause
