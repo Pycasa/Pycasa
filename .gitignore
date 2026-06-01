@@ -14,3 +14,5 @@ src/main/webapp/dist/
 
 # Couchbase Lite native library temp dir (auto-generated at runtime)
 CouchbaseLiteTemp/
+*.exe
+*.jar
