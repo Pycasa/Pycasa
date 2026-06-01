@@ -19,12 +19,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-windows-exe:
+  build-windows-installer:
     name: Build Pycasa Installer
     runs-on: windows-latest
 
     permissions:
-      contents: write   # needed to upload release assets
+      contents: write
 
     defaults:
       run:
@@ -33,6 +33,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}"
+          if (-not $v -or $v -eq "") { $v = "dev" }
+          Write-Host "Version: $v"
+          echo "value=$v" >> $env:GITHUB_OUTPUT
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -56,20 +65,23 @@ jobs:
         run: |
           if (!(Test-Path "Pycasa.exe")) { Write-Error "Pycasa.exe not found"; exit 1 }
           $size = [math]::Round((Get-Item "Pycasa.exe").Length / 1MB, 2)
-          Write-Host "Pycasa.exe built successfully (${size} MB)"
+          Write-Host "Pycasa.exe built (${size} MB)"
 
       - name: Install Inno Setup 6
         run: choco install innosetup --no-progress -y
 
-      - name: Build PycasaSetup.exe (installer)
-        run: |
-          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $iscc pycasa.iss
-          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup compilation failed"; exit 1 }
-          $size = [math]::Round((Get-Item "dist\PycasaSetup.exe").Length / 1MB, 2)
-          Write-Host "PycasaSetup.exe built successfully (${size} MB)"
+      - name: Generate installer branding images
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File make-installer-images.ps1
 
-      # Upload both artifacts for every push/PR
+      - name: Build PycasaSetup-{version}.exe
+        run: |
+          $version = "${{ steps.version.outputs.value }}"
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc /DMyAppVersion=$version pycasa.iss
+          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed"; exit 1 }
+          $installer = Get-Item "dist\PycasaSetup-${version}.exe"
+          Write-Host "$($installer.Name) — $([math]::Round($installer.Length/1MB,2)) MB"
+
       - name: Upload Pycasa.exe artifact
         uses: actions/upload-artifact@v4
         with:
@@ -77,17 +89,16 @@ jobs:
           path: apps/windows/Pycasa.exe
           retention-days: 14
 
-      - name: Upload PycasaSetup.exe artifact
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: Pycasa-windows-installer
-          path: apps/windows/dist/PycasaSetup.exe
+          path: apps/windows/dist/PycasaSetup-${{ steps.version.outputs.value }}.exe
           retention-days: 14
 
-      # On release: attach the installer to the GitHub Release
       - name: Upload installer to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/windows/dist/PycasaSetup.exe
+          files: apps/windows/dist/PycasaSetup-${{ steps.version.outputs.value }}.exe
           tag_name: ${{ github.ref_name }}

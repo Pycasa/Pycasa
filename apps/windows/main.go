@@ -110,12 +110,15 @@ func main() {
 		}
 	}
 
-	// 3. Locate Pycasa JAR file
+	// 3. Locate Pycasa JAR file — always search relative to the exe's own directory
+	// so the bundled JAR is found after installation to Program Files.
+	exePath, _ := os.Executable()
+	exeDir := filepath.Dir(exePath)
+
 	searchPatterns := []string{
-		"./*runner.jar",
-		"./pycasa-*.jar",
-		"./target/*runner.jar",
-		"../../target/*runner.jar",
+		filepath.Join(exeDir, "*runner.jar"),
+		filepath.Join(exeDir, "pycasa-*.jar"),
+		filepath.Join(exeDir, "*.jar"),
 	}
 
 	var jarPath string
@@ -128,7 +131,7 @@ func main() {
 	}
 
 	if jarPath == "" {
-		showMessageBox("Pycasa Error", "Pycasa server JAR file not found.\n\nPlease ensure the Pycasa server JAR file (e.g. pycasa-v0.0.1-runner.jar) is located in the same folder as this application.", 0x00000010)
+		showMessageBox("Pycasa Error", "Pycasa server JAR file not found.\n\nPlease reinstall Pycasa or contact support.", 0x00000010)
 		return
 	}
 

@@ -1,8 +1,15 @@
 @echo off
 setlocal enabledelayedexpansion
 echo ===================================================
-echo Building Pycasa Windows Wrapper Executable
+echo Building Pycasa Windows Installer
 echo ===================================================
+echo.
+
+:: Optional: pass version as first argument, e.g. build.bat v1.2.3
+:: Defaults to "dev" if not provided
+set "APP_VERSION=%~1"
+if "!APP_VERSION!"=="" set "APP_VERSION=dev"
+echo Version: !APP_VERSION!
 echo.
 
 :: Check for Go installation
@@ -61,7 +68,15 @@ if "!JAR_EXISTS!"=="1" (
     powershell -NoProfile -Command "$ProgressPreference = 'SilentlyContinue'; try { $r = Invoke-RestMethod -Uri 'https://api.github.com/repos/Pycasa/Pycasa/releases/latest'; $a = $r.assets | Where-Object { $_.name -like '*runner.jar' -or $_.name -like '*.jar' } | Select-Object -First 1; if ($a) { Write-Host ('Downloading latest server JAR: ' + $a.name + ' (' + [math]::round($a.size/1MB, 1) + ' MB)...'); Invoke-WebRequest -Uri $a.browser_download_url -OutFile $a.name; Write-Host 'Download complete' } else { throw 'No JAR asset found' } } catch { Write-Warning ('Failed to download from GitHub: ' + $_.Exception.Message) }"
 )
 
-echo [5/5] Building Windows installer (PycasaSetup.exe)...
+echo [5/6] Generating installer branding images from favicon.ico...
+powershell -NoProfile -ExecutionPolicy Bypass -File make-installer-images.ps1
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to generate installer images.
+    pause
+    exit /b %errorlevel%
+)
+
+echo [6/6] Building Windows installer (PycasaSetup-!APP_VERSION!.exe)...
 
 :: Look for ISCC.exe (Inno Setup compiler) in standard install locations
 set "ISCC="
@@ -80,23 +95,23 @@ if "!ISCC!"=="" (
     echo           The bare Pycasa.exe was still built successfully.
 ) else (
     echo Using Inno Setup compiler: !ISCC!
-    !ISCC! pycasa.iss
+    !ISCC! /DMyAppVersion=!APP_VERSION! pycasa.iss
     if !errorlevel! neq 0 (
         echo [ERROR] Inno Setup compilation failed.
         pause
         exit /b !errorlevel!
     )
-    echo [INFO] Installer created: dist\PycasaSetup.exe
+    echo [INFO] Installer created: dist\PycasaSetup-!APP_VERSION!.exe
 )
 
 echo.
 echo ===================================================
 echo [SUCCESS] Build completed successfully!
 echo.
-echo   Wrapper exe : apps/windows/Pycasa.exe
-echo   Installer   : apps/windows/dist/PycasaSetup.exe
+echo   Wrapper exe : Pycasa.exe
+echo   Installer   : dist\PycasaSetup-!APP_VERSION!.exe
 echo.
-echo Distribute 'PycasaSetup.exe' to end users.
+echo Distribute 'PycasaSetup-!APP_VERSION!.exe' to end users.
 echo ===================================================
 echo.
 pause
