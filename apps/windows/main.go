@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	jarProcess *exec.Cmd
-	appConfig  *Config
+	jarProcess    *exec.Cmd
+	appConfig     *Config
+	edgeProcesses []*exec.Cmd
 )
 
 func showMessageBox(title, text string, style uintptr) {
@@ -45,7 +46,7 @@ func main() {
 				return
 			}
 			// If not focused (e.g. window closed), just open Edge and exit
-			_, err = LaunchEdgeApp(fmt.Sprintf("http://127.0.0.1:%d", appConfig.Port))
+			err = launchEdge(fmt.Sprintf("http://127.0.0.1:%d", appConfig.Port))
 			if err != nil {
 				showMessageBox("Pycasa Error", fmt.Sprintf("Failed to open browser: %v", err), 0x00000010)
 			}
@@ -148,15 +149,15 @@ func onReady() {
 		appConfig.Port,
 		func() { // onOpen
 			if !FocusWindow("Pycasa") {
-				LaunchEdgeApp(fmt.Sprintf("http://127.0.0.1:%d", appConfig.Port))
+				launchEdge(fmt.Sprintf("http://127.0.0.1:%d", appConfig.Port))
 			}
 		},
 		func() { // onSettings
 			if !FocusWindow("Pycasa") {
-				LaunchEdgeApp(fmt.Sprintf("http://127.0.0.1:%d/settings", appConfig.Port))
+				launchEdge(fmt.Sprintf("http://127.0.0.1:%d/settings", appConfig.Port))
 			} else {
 				// If window is open, navigate to settings by opening settings URL
-				LaunchEdgeApp(fmt.Sprintf("http://127.0.0.1:%d/settings", appConfig.Port))
+				launchEdge(fmt.Sprintf("http://127.0.0.1:%d/settings", appConfig.Port))
 			}
 		},
 		func() { // onQuit
@@ -170,7 +171,7 @@ func onReady() {
 		maxRetries := 60 // 60 retries * 500ms = 30 seconds max wait
 		for retries < maxRetries {
 			if IsServerHealthy(appConfig.Port) {
-				_, err := LaunchEdgeApp(fmt.Sprintf("http://127.0.0.1:%d", appConfig.Port))
+				err := launchEdge(fmt.Sprintf("http://127.0.0.1:%d", appConfig.Port))
 				if err != nil {
 					logError("Failed to auto-open app in browser: %v", err)
 				}
@@ -185,17 +186,33 @@ func onReady() {
 }
 
 func onExit() {
-	logError("onExit callback triggered. Terminating Pycasa JAR process...")
-	if jarProcess != nil && jarProcess.Process != nil {
-		err := jarProcess.Process.Kill()
-		if err != nil {
-			logError("Failed to kill Pycasa JAR process: %v", err)
-		} else {
-			logError("Successfully terminated Pycasa JAR process.")
+	logError("onExit: force-killing all processes (kill -9 equivalent)...")
+
+	// --- Kill Edge windows ---
+	for i, cmd := range edgeProcesses {
+		if cmd != nil && cmd.Process != nil {
+			logError("Force-killing Edge process %d (PID: %d)", i, cmd.Process.Pid)
+			ForceKillPID(cmd.Process.Pid)
 		}
-	} else {
-		logError("Cannot kill Pycasa JAR process: jarProcess or Process is nil.")
 	}
+
+	// --- Kill JAR: Layer 1 - use tracked PID ---
+	if jarProcess != nil && jarProcess.Process != nil {
+		pid := jarProcess.Process.Pid
+		logError("Force-killing JAR process (PID: %d) via TerminateProcess + taskkill...", pid)
+		ForceKillPID(pid)
+	} else {
+		logError("jarProcess PID not available, falling back to port-based kill...")
+	}
+
+	// --- Kill JAR: Layer 2 - nuke by port (catches any JVM that slipped through) ---
+	if appConfig != nil {
+		logError("Force-killing any process on port %d via netstat...", appConfig.Port)
+		ForceKillByPort(appConfig.Port)
+	}
+
+	logError("Force exit complete.")
+	os.Exit(0)
 }
 
 func logError(format string, args ...interface{}) {
@@ -209,4 +226,15 @@ func logError(format string, args ...interface{}) {
 		defer logFile.Close()
 		logFile.WriteString(fmt.Sprintf("[ERROR] "+format+"\n", args...))
 	}
+}
+
+func launchEdge(url string) error {
+	cmd, err := LaunchEdgeApp(url)
+	if err != nil {
+		return err
+	}
+	if cmd != nil {
+		edgeProcesses = append(edgeProcesses, cmd)
+	}
+	return nil
 }

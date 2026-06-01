@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -252,4 +254,53 @@ func AssociateWithJobObject(cmd *exec.Cmd) error {
 	}
 
 	return nil
+}
+
+// ForceKillPID is the Windows equivalent of kill -9.
+// It opens the process with PROCESS_TERMINATE rights and calls TerminateProcess,
+// which cannot be caught or ignored by the target process.
+// It also runs taskkill /F /T to kill the entire process tree (JVM child threads).
+func ForceKillPID(pid int) {
+	if pid <= 0 {
+		return
+	}
+
+	// Layer 1: TerminateProcess (true kill-9 via Windows API)
+	hProcess, err := windows.OpenProcess(
+		windows.PROCESS_TERMINATE,
+		false,
+		uint32(pid),
+	)
+	if err == nil {
+		windows.TerminateProcess(hProcess, 1)
+		windows.CloseHandle(hProcess)
+	}
+
+	// Layer 2: taskkill /F /T kills the whole process tree (JVM spawns child processes)
+	exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(pid)).Run()
+}
+
+// ForceKillByPort finds and kills whatever process is listening on the given TCP port.
+// This is the nuclear fallback - even if we lost track of the PID, we kill it by port.
+func ForceKillByPort(port int) {
+	// Use netstat to find the PID listening on the port
+	out, err := exec.Command("netstat", "-ano", "-p", "TCP").Output()
+	if err != nil {
+		return
+	}
+
+	target := fmt.Sprintf(":%d ", port)
+	scanner := bufio.NewScanner(strings.NewReader(string(out)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, target) && strings.Contains(line, "LISTENING") {
+			fields := strings.Fields(line)
+			if len(fields) >= 5 {
+				pid, err := strconv.Atoi(fields[4])
+				if err == nil && pid > 0 {
+					ForceKillPID(pid)
+				}
+			}
+		}
+	}
 }
