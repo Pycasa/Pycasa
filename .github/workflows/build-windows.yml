@@ -43,6 +43,12 @@ jobs:
       - name: Fetch Go dependencies
         run: go mod download
 
+      - name: Install rsrc (icon embedder)
+        run: go install github.com/akavel/rsrc@latest
+
+      - name: Generate resource.syso (embed favicon.ico into exe)
+        run: rsrc -ico favicon.ico -o resource.syso
+
       - name: Build Pycasa.exe
         run: |
           go build -ldflags "-H windowsgui -s -w" -o Pycasa.exe .

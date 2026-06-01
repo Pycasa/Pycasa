@@ -24,8 +24,22 @@ if %errorlevel% neq 0 (
     exit /b %errorlevel%
 )
 
-echo [2/2] Compiling Pycasa.exe (with hidden console window)...
-go build -ldflags "-H windowsgui" -o Pycasa.exe
+echo [2/3] Embedding app icon into executable...
+go install github.com/akavel/rsrc@latest
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to install rsrc tool.
+    pause
+    exit /b %errorlevel%
+)
+rsrc -ico favicon.ico -o resource.syso
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to generate resource file from icon.
+    pause
+    exit /b %errorlevel%
+)
+
+echo [3/3] Compiling Pycasa.exe (with hidden console window and embedded icon)...
+go build -ldflags "-H windowsgui -s -w" -o Pycasa.exe .
 if %errorlevel% neq 0 (
     echo [ERROR] Go compilation failed.
     echo.

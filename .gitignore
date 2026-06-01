@@ -16,3 +16,6 @@ src/main/webapp/dist/
 CouchbaseLiteTemp/
 *.exe
 *.jar
+
+# Generated Windows resource file (produced by rsrc during build)
+apps/windows/resource.syso
