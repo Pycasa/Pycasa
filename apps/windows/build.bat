@@ -61,8 +61,21 @@ for %%f in (*runner.jar pycasa-*.jar) do (
     set "FOUND_JAR=%%f"
 )
 
+if "!JAR_EXISTS!"=="0" (
+    if exist "..\..\target" (
+        for %%f in (..\..\target\*runner.jar ..\..\target\pycasa-*.jar) do (
+            if exist "%%f" (
+                echo [INFO] Found local Maven target JAR: %%f
+                copy /y "%%f" . >nul
+                set "JAR_EXISTS=1"
+                set "FOUND_JAR=%%~nxf"
+            )
+        )
+    )
+)
+
 if "!JAR_EXISTS!"=="1" (
-    echo [INFO] Local server JAR already exists: !FOUND_JAR!
+    echo [INFO] Server JAR ready: !FOUND_JAR!
 ) else (
     echo Server JAR not found locally. Fetching latest release from GitHub...
     powershell -NoProfile -Command "$ProgressPreference = 'SilentlyContinue'; try { $r = Invoke-RestMethod -Uri 'https://api.github.com/repos/Pycasa/Pycasa/releases/latest'; $a = $r.assets | Where-Object { $_.name -like '*runner.jar' -or $_.name -like '*.jar' } | Select-Object -First 1; if ($a) { Write-Host ('Downloading latest server JAR: ' + $a.name + ' (' + [math]::round($a.size/1MB, 1) + ' MB)...'); Invoke-WebRequest -Uri $a.browser_download_url -OutFile $a.name; Write-Host 'Download complete' } else { throw 'No JAR asset found' } } catch { Write-Warning ('Failed to download from GitHub: ' + $_.Exception.Message) }"

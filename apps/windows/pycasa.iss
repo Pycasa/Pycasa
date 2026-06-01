@@ -10,9 +10,13 @@
 #define AppExeName   "Pycasa.exe"
 #define AppIcon      "favicon.ico"
 
-; AppVersion: prefer the /DMyAppVersion override from ISCC CLI, else read from exe
+; AppVersion: prefer the /DMyAppVersion override from ISCC CLI
 #ifndef MyAppVersion
-  #define MyAppVersion GetVersionNumbersString("Pycasa.exe")
+  #define MyAppVersion "0.0.0"
+#endif
+#if MyAppVersion == ""
+  #undef MyAppVersion
+  #define MyAppVersion "0.0.0"
 #endif
 
 [Setup]

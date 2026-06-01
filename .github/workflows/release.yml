@@ -81,7 +81,27 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: pycasa-runner
-          path: apps/windows/
+          path: jar-download/
+
+      - name: Move JAR into apps/windows/ (flatten)
+        shell: pwsh
+        run: |
+          $jar = Get-ChildItem -Path "${{ github.workspace }}/jar-download" -Recurse -Filter "*runner.jar" | Select-Object -First 1
+          if (!$jar) { Write-Error "JAR not found in artifact"; exit 1 }
+          Copy-Item $jar.FullName -Destination "${{ github.workspace }}/apps/windows/$($jar.Name)"
+          Write-Host "JAR ready: $($jar.Name)"
+        working-directory: ${{ github.workspace }}
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}"
+          if (-not $v -or $v -eq "") { $v = "dev" }
+          # Sanitize: replace chars invalid in Windows filenames
+          $v = $v -replace '[/\\:*?"<>|]', '-'
+          Write-Host "Version: $v"
+          "value=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -107,21 +127,28 @@ jobs:
       - name: Generate installer branding images
         run: powershell -NoProfile -ExecutionPolicy Bypass -File make-installer-images.ps1
 
+      - name: Verify files before ISCC
+        run: |
+          Write-Host "=== Files in apps/windows ==="
+          Get-ChildItem | Select-Object Name, Length | Format-Table
+          $jar = Get-ChildItem -Filter "*runner.jar"
+          if (!$jar) { Write-Error "JAR missing - installer will not be self-contained"; exit 1 }
+          Write-Host "JAR found: $($jar.Name) ($([math]::Round($jar.Length/1MB,1)) MB)"
+
       - name: Build PycasaSetup-{version}.exe (self-contained installer)
         run: |
-          $version = "${{ github.ref_name }}"
+          $version = "${{ steps.version.outputs.value }}"
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $iscc /DMyAppVersion=$version pycasa.iss
+          & $iscc "/DMyAppVersion=$version" pycasa.iss
           if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed"; exit 1 }
           $installer = Get-Item "dist\PycasaSetup-${version}.exe"
-          $size = [math]::Round($installer.Length / 1MB, 2)
-          Write-Host "$($installer.Name) built (${size} MB) — JAR bundled inside"
+          Write-Host "$($installer.Name) -- $([math]::Round($installer.Length/1MB,2)) MB (JAR bundled)"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: Pycasa-windows-installer
-          path: apps/windows/dist/PycasaSetup-${{ github.ref_name }}.exe
+          path: apps/windows/dist/PycasaSetup-${{ steps.version.outputs.value }}.exe
           retention-days: 14
 
   build-and-push-docker:
