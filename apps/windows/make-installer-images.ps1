@@ -56,12 +56,12 @@ $strFormat.Alignment = [System.Drawing.StringAlignment]::Center
 $labelRect  = New-Object System.Drawing.RectangleF(0, ($iy + $iconSize + 12), $bannerW, 30)
 $g.DrawString("Pycasa", $font, $whiteBrush, $labelRect, $strFormat)
 
-# "Photo Library" subtitle
+# "Pycasa" subtitle
 $subFont  = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Regular)
 $subColor = [System.Drawing.Color]::FromArgb(190, 160, 230)
 $subBrush = New-Object System.Drawing.SolidBrush($subColor)
 $subRect  = New-Object System.Drawing.RectangleF(0, ($iy + $iconSize + 44), $bannerW, 20)
-$g.DrawString("Photo Library", $subFont, $subBrush, $subRect, $strFormat)
+$g.DrawString("Pycasa", $subFont, $subBrush, $subRect, $strFormat)
 
 $g.Dispose()
 $bannerPath = Join-Path $PSScriptRoot "installer_banner.bmp"
