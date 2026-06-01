@@ -1,0 +1,73 @@
+name: Build Windows App
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/windows/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'apps/windows/**'
+  release:
+    types: [ created ]
+  workflow_dispatch:
+  workflow_call:   # allows release.yml to call this as a reusable workflow
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-exe:
+    name: Build Pycasa.exe
+    runs-on: windows-latest
+
+    permissions:
+      contents: write   # needed to upload release assets
+
+    defaults:
+      run:
+        working-directory: apps/windows
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/windows/go.mod
+          cache-dependency-path: apps/windows/go.sum
+
+      - name: Fetch Go dependencies
+        run: go mod download
+
+      - name: Build Pycasa.exe
+        run: |
+          go build -ldflags "-H windowsgui -s -w" -o Pycasa.exe .
+
+      - name: Verify binary exists
+        run: |
+          if (!(Test-Path "Pycasa.exe")) {
+            Write-Error "Pycasa.exe was not created"
+            exit 1
+          }
+          $size = (Get-Item "Pycasa.exe").length / 1MB
+          Write-Host "Pycasa.exe built successfully ($([math]::Round($size, 2)) MB)"
+
+      # Upload as a workflow artifact on every push/PR so devs can download it
+      - name: Upload Pycasa.exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pycasa-windows-x64
+          path: apps/windows/Pycasa.exe
+          retention-days: 14
+
+      # On release: attach Pycasa.exe directly to the GitHub Release
+      - name: Upload Pycasa.exe to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/windows/Pycasa.exe
+          tag_name: ${{ github.ref_name }}
