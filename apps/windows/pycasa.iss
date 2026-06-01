@@ -81,7 +81,7 @@ Name: "startmenuicon"; Description: "Create a &Start Menu shortcut"; GroupDescri
 Source: "Pycasa.exe";       DestDir: "{app}"; DestName: "{#AppExeName}"; Flags: ignoreversion
 Source: "favicon.ico";      DestDir: "{app}"; Flags: ignoreversion
 ; Bundled server JAR — always present in CI builds; skipifsourcedoesntexist for local dev
-Source: "*runner.jar";      DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "*runner.jar";      DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu
