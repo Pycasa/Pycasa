@@ -4,19 +4,46 @@ import ImageCard from './ImageCard';
 import ImageDetailModal from './ImageDetailModal';
 import { Loader2, Calendar } from 'lucide-react';
 
+const PlaceholderCard = () => (
+    <div className="border-2 border-transparent rounded-none aspect-[4/3] bg-slate-100 animate-pulse" />
+);
+
 const TimelineView = () => {
+    const [metadata, setMetadata] = useState(null);
+    const [metadataLoading, setMetadataLoading] = useState(true);
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [activeKey, setActiveKey] = useState(null); // format: "year-month"
     const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(true);
     const containerRef = useRef(null);
     const monthRefs = useRef({});
 
-    // Initial load
+    // Initial load: fetch metadata first, then the first page of images
     useEffect(() => {
-        fetchImages(1);
+        const loadTimeline = async () => {
+            setMetadataLoading(true);
+            try {
+                const meta = await api.images.getMetadata();
+                setMetadata(meta);
+                setMetadataLoading(false);
+
+                // Fetch first page of images
+                setLoading(true);
+                const limit = 30;
+                const newImages = await api.images.list(null, null, null, 'modified_at', 'DESC', 1, limit);
+                if (Array.isArray(newImages)) {
+                    setImages(newImages);
+                    setPage(1);
+                }
+            } catch (error) {
+                console.error('Failed to load timeline:', error);
+            } finally {
+                setMetadataLoading(false);
+                setLoading(false);
+            }
+        };
+        loadTimeline();
     }, []);
 
     const fetchImages = async (pageNum) => {
@@ -38,12 +65,6 @@ const TimelineView = () => {
                         return [...prev, ...uniqueNew];
                     });
                 }
-
-                if (newImages.length < limit) {
-                    setHasMore(false);
-                } else {
-                    setHasMore(true);
-                }
                 setPage(pageNum);
             }
         } catch (error) {
@@ -53,31 +74,57 @@ const TimelineView = () => {
         }
     };
 
+    const totalImageCount = useMemo(() => {
+        return Object.values(metadata || {}).reduce((sum, val) => sum + val, 0);
+    }, [metadata]);
+
+    const hasMore = images.length < totalImageCount;
+
     const loadMore = useCallback(() => {
         if (!loading && hasMore) {
             fetchImages(page + 1);
         }
     }, [loading, hasMore, page]);
 
-    const groupedImages = useMemo(() => {
+    const groupedSlots = useMemo(() => {
+        if (!metadata) return {};
         const groups = {};
-        // Images are already sorted by modified DESC from DB, but let's ensure client sort too
-        const sortedImages = [...images].sort((a, b) => b.modified_at - a.modified_at);
+        let globalIndex = 0;
 
-        sortedImages.forEach(img => {
-            const date = new Date(img.modified_at); // DB uses 'modified_at'
+        // Sort dates in descending order
+        const sortedDates = Object.keys(metadata).sort((a, b) => b.localeCompare(a));
+
+        sortedDates.forEach(dateStr => {
+            const count = metadata[dateStr];
+            if (count <= 0) return;
+
+            // dateStr format: YYYY-MM-DD
+            const date = new Date(dateStr + "T00:00:00");
             const year = date.getFullYear();
             const month = date.getMonth(); // 0-11
+            const day = date.getDate(); // 1-31
 
             if (!groups[year]) groups[year] = {};
-            if (!groups[year][month]) groups[year][month] = [];
-            groups[year][month].push(img);
+            if (!groups[year][month]) groups[year][month] = {};
+            if (!groups[year][month][day]) groups[year][month][day] = [];
+
+            for (let i = 0; i < count; i++) {
+                groups[year][month][day].push({
+                    index: globalIndex++,
+                    dateStr,
+                    year,
+                    month,
+                    day
+                });
+            }
         });
 
         return groups;
-    }, [images]);
+    }, [metadata]);
 
-    const years = useMemo(() => Object.keys(groupedImages).sort((a, b) => b - a), [groupedImages]);
+    const years = useMemo(() => Object.keys(groupedSlots).sort((a, b) => b - a), [groupedSlots]);
+
+
 
     // Scroll synchronization & Infinite Scroll
     useEffect(() => {
@@ -113,7 +160,7 @@ const TimelineView = () => {
 
         container.addEventListener('scroll', handleScroll);
         return () => container.removeEventListener('scroll', handleScroll);
-    }, [years, groupedImages, hasMore, loading, loadMore]);
+    }, [years, groupedSlots, hasMore, loading, loadMore]);
 
     const scrollToMonth = (year, month) => {
         const key = `${year}-${month}`;
@@ -122,7 +169,7 @@ const TimelineView = () => {
             element.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
             // Find next available
-            const availableMonths = Object.keys(groupedImages[year] || {}).map(Number).sort((a, b) => b - a);
+            const availableMonths = Object.keys(groupedSlots[year] || {}).map(Number).sort((a, b) => b - a);
             const nextMonth = availableMonths.find(m => m <= month) || availableMonths[availableMonths.length - 1];
             if (nextMonth !== undefined) {
                 const nextKey = `${year}-${nextMonth}`;
@@ -145,7 +192,7 @@ const TimelineView = () => {
         };
     }, [selectedImage]);
 
-    if (loading && images.length === 0) {
+    if (metadataLoading) {
         return (
             <div className="h-full min-h-[400px] flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -163,7 +210,7 @@ const TimelineView = () => {
                 {years.length > 0 ? (
                     years.map(year => (
                         <div key={year} className="mb-20">
-                            {Object.keys(groupedImages[year])
+                            {Object.keys(groupedSlots[year])
                                 .sort((a, b) => b - a)
                                 .map(month => (
                                     <div
@@ -171,23 +218,33 @@ const TimelineView = () => {
                                         ref={el => monthRefs.current[`${year}-${month}`] = el}
                                         className="mb-12 scroll-mt-24"
                                     >
-                                        <h3 className="text-xl font-bold text-slate-700 mb-6 flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                <Calendar className="w-4 h-4 text-primary" />
-                                            </div>
-                                            {monthNames[month]} {year}
-                                        </h3>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-1">
-                                            {groupedImages[year][month].map(image => (
-                                                <ImageCard
-                                                    key={image.id || image.file_path}
-                                                    className="border border-red-900 pb-10 bg-red-900"
-                                                    image={{ ...image, full_path: image.file_path, modified: image.modified_at, size: image.file_size }} // Map DB fields to frontend expected
-                                                    isSelected={selectedImage?.id === image.id}
-                                                    onSelect={(img) => setSelectedImage(img)}
-                                                />
+                                        {Object.keys(groupedSlots[year][month])
+                                            .sort((a, b) => Number(b) - Number(a))
+                                            .map(day => (
+                                                <div key={`${year}-${month}-${day}`} className="mb-8 last:mb-0">
+                                                    <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                            <Calendar className="w-4 h-4 text-primary" />
+                                                        </div>
+                                                        {day} {monthNames[month]} {year}
+                                                    </h3>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-0">
+                                                        {groupedSlots[year][month][day].map(slot => {
+                                                            const image = images[slot.index];
+                                                            return image ? (
+                                                                <ImageCard
+                                                                    key={image.id || image.file_path}
+                                                                    image={{ ...image, full_path: image.file_path, modified: image.modified_at, size: image.file_size }} // Map DB fields to frontend expected
+                                                                    isSelected={selectedImage?.id === image.id}
+                                                                    onSelect={(img) => setSelectedImage(img)}
+                                                                />
+                                                            ) : (
+                                                                <PlaceholderCard key={`placeholder-${slot.index}`} />
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
                                             ))}
-                                        </div>
                                     </div>
                                 ))}
                         </div>
@@ -224,7 +281,7 @@ const TimelineView = () => {
                                 </div>
                                 <div className="flex flex-col gap-1.5">
                                     {[11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map(m => {
-                                        const hasImages = groupedImages[year] && groupedImages[year][m];
+                                        const hasImages = groupedSlots[year] && groupedSlots[year][m] && Object.keys(groupedSlots[year][m]).length > 0;
                                         const isActive = activeKey === `${year}-${m}`;
 
                                         return (
@@ -260,34 +317,22 @@ const TimelineView = () => {
                 onClose={() => setSelectedImage(null)}
                 onUpdate={() => fetchImages(1)}
                 onNext={() => {
-                    const allSortedImages = years.flatMap(y =>
-                        Object.keys(groupedImages[y]).sort((a, b) => b - a).flatMap(m => groupedImages[y][m])
-                    );
-                    const currentIndex = allSortedImages.findIndex(img => img.id === selectedImage?.id);
-                    if (currentIndex < allSortedImages.length - 1) {
-                        setSelectedImage(allSortedImages[currentIndex + 1]);
+                    const currentIndex = images.findIndex(img => img.id === selectedImage?.id);
+                    if (currentIndex < images.length - 1) {
+                        setSelectedImage(images[currentIndex + 1]);
                     }
                 }}
                 onPrevious={() => {
-                    const allSortedImages = years.flatMap(y =>
-                        Object.keys(groupedImages[y]).sort((a, b) => b - a).flatMap(m => groupedImages[y][m])
-                    );
-                    const currentIndex = allSortedImages.findIndex(img => img.id === selectedImage?.id);
+                    const currentIndex = images.findIndex(img => img.id === selectedImage?.id);
                     if (currentIndex > 0) {
-                        setSelectedImage(allSortedImages[currentIndex - 1]);
+                        setSelectedImage(images[currentIndex - 1]);
                     }
                 }}
                 hasNext={selectedImage && (() => {
-                    const allSortedImages = years.flatMap(y =>
-                        Object.keys(groupedImages[y]).sort((a, b) => b - a).flatMap(m => groupedImages[y][m])
-                    );
-                    return allSortedImages.findIndex(img => img.id === selectedImage.id) < allSortedImages.length - 1;
+                    return images.findIndex(img => img.id === selectedImage.id) < images.length - 1;
                 })()}
                 hasPrevious={selectedImage && (() => {
-                    const allSortedImages = years.flatMap(y =>
-                        Object.keys(groupedImages[y]).sort((a, b) => b - a).flatMap(m => groupedImages[y][m])
-                    );
-                    return allSortedImages.findIndex(img => img.id === selectedImage.id) > 0;
+                    return images.findIndex(img => img.id === selectedImage.id) > 0;
                 })()}
             />
         </div>

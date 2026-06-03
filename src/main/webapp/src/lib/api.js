@@ -154,6 +154,7 @@ class ApiClient {
     getTags: () => this.request('/images/tags'),
     getDetails: (path) => this.request(`/images/details?path=${encodeURIComponent(path)}`),
     getRawUrl: (path) => `${this.baseURL}/images/raw?path=${encodeURIComponent(path)}`,
+    getThumbnail: (path) => `${this.baseURL}/images/thumbnail?path=${encodeURIComponent(path)}`,
     updateMetadata: (data) => this.request('/images/metadata', {
       method: 'PATCH',
       body: JSON.stringify(data),

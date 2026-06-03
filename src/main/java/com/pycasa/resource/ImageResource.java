@@ -56,6 +56,9 @@ public class ImageResource {
     @GET
     @Path("/metadata")
     public Response getMetadata(@QueryParam("path") String path, @QueryParam("id") String id) {
+        if (path == null && id == null) {
+            return Response.ok(db.getImageDateCounts()).build();
+        }
         ImageRecord img = null;
         if (id != null) img = db.get(id, ImageRecord.class);
         if (img == null && path != null) img = db.findImageByPath(path);
@@ -219,4 +222,44 @@ public class ImageResource {
             return Response.serverError().build();
         }
     }
-}
+    @GET
+    @Path("/thumbnail")
+    @Produces("image/jpeg")
+    public Response getThumbnail(@QueryParam("path") String path) {
+        if (path == null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+        File src = new File(path);
+        if (!src.exists()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        try {
+            // Determine thumbnail cache directory inside the DB directory
+            String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
+            File thumbDir = new File(dir, "thumbs");
+            thumbDir.mkdirs();
+            String thumbName = src.getName() + "_thumb.jpg";
+            File thumbFile = new File(thumbDir, thumbName);
+            if (!thumbFile.exists()) {
+                // Generate thumbnail (max width 200px) using ImageIO
+                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(src);
+                if (img == null) {
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Unable to read image").build();
+                }
+                int w = img.getWidth();
+                int h = img.getHeight();
+                int newW = Math.min(200, w);
+                int newH = (newW * h) / w;
+                java.awt.image.BufferedImage thumb = new java.awt.image.BufferedImage(newW, newH, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                java.awt.Graphics2D g = thumb.createGraphics();
+                g.drawImage(img, 0, 0, newW, newH, null);
+                g.dispose();
+                javax.imageio.ImageIO.write(thumb, "jpg", thumbFile);
+            }
+            return Response.ok(thumbFile, "image/jpeg").build();
+        } catch (Exception e) {
+            LOG.warnf("Failed to generate thumbnail for %s: %s", path, e.getMessage());
+            return Response.serverError().build();
+        }
+    }
+    }
