@@ -1,0 +1,126 @@
+name: Build Windows App
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/windows/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'apps/windows/**'
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-jar:
+    name: Build Uber-JAR
+    uses: ./.github/workflows/maven-build.yml
+    with:
+      version: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || (github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha) }}
+      skip-tests: true
+      retention-days: 14
+
+  build-windows-installer:
+    name: Build Pycasa Installer
+    runs-on: windows-latest
+    needs: build-jar
+
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        working-directory: apps/windows
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download server JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pycasa-runner
+          path: jar-download/
+
+      - name: Move JAR into apps/windows/ (flatten)
+        shell: pwsh
+        run: |
+          $jar = Get-ChildItem -Path "${{ github.workspace }}/jar-download" -Recurse -Filter "*runner.jar" | Select-Object -First 1
+          if (!$jar) { Write-Error "JAR not found in artifact"; exit 1 }
+          Copy-Item $jar.FullName -Destination "${{ github.workspace }}/apps/windows/$($jar.Name)"
+          Write-Host "JAR ready: $($jar.Name)"
+        working-directory: ${{ github.workspace }}
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}"
+          # Check if we should use commit hash (for autobuilds, PRs etc)
+          $isTag = $v -match '^v?[0-9]+\.[0-9]+'
+          if (-not $isTag) {
+              $v = "${{ needs.build-jar.outputs.version }}"
+          }
+          if (-not $v -or $v -eq "") { $v = "dev" }
+          # Sanitize: replace chars invalid in Windows filenames
+          $v = $v -replace '[/\\:*?"<>|]', '-'
+          Write-Host "Version: $v"
+          "value=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/windows/go.mod
+          cache-dependency-path: apps/windows/go.sum
+
+      - name: Fetch Go dependencies
+        run: go mod download
+
+      - name: Install rsrc (icon embedder)
+        run: go install github.com/akavel/rsrc@latest
+
+      - name: Generate resource.syso (embed favicon.ico into exe)
+        run: rsrc -ico favicon.ico -o resource.syso
+
+      - name: Build Pycasa.exe
+        run: go build -ldflags "-H windowsgui -s -w" -o Pycasa.exe .
+
+      - name: Verify Pycasa.exe
+        run: |
+          if (!(Test-Path "Pycasa.exe")) { Write-Error "Pycasa.exe not found"; exit 1 }
+          $size = [math]::Round((Get-Item "Pycasa.exe").Length / 1MB, 2)
+          Write-Host "Pycasa.exe built (${size} MB)"
+
+      - name: Install Inno Setup 6
+        run: choco install innosetup --no-progress -y
+
+      - name: Generate installer branding images
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File make-installer-images.ps1
+
+      - name: Build PycasaSetup-{version}.exe
+        run: |
+          $version = "${{ steps.version.outputs.value }}"
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DMyAppVersion=$version" pycasa.iss
+          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed"; exit 1 }
+          $installer = Get-Item "dist\PycasaSetup-${version}.exe"
+          Write-Host "$($installer.Name) -- $([math]::Round($installer.Length/1MB,2)) MB"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pycasa-windows-installer
+          path: apps/windows/dist/PycasaSetup-${{ steps.version.outputs.value }}.exe
+          retention-days: 14
+
+      - name: Upload installer to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/windows/dist/PycasaSetup-${{ steps.version.outputs.value }}.exe
+          tag_name: ${{ github.ref_name }}

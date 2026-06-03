@@ -6,7 +6,7 @@
 
     <groupId>com.pycasa</groupId>
     <artifactId>pycasa-server</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>pycasa-revision</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
