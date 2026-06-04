@@ -37,7 +37,7 @@ public class ImageResource {
             @QueryParam("sort_by") @DefaultValue("modified_at") String sortBy,
             @QueryParam("sort_order") @DefaultValue("DESC") String sortOrder,
             @QueryParam("page") @DefaultValue("1") int page,
-            @QueryParam("limit") @DefaultValue("30") int limit) {
+            @QueryParam("limit") @DefaultValue("30") int limit, @QueryParam("before") String before) {
 
         List<String> tagList = (tags != null && !tags.isBlank())
                 ? Arrays.asList(tags.split(","))
@@ -234,27 +234,35 @@ public class ImageResource {
             return Response.status(Response.Status.NOT_FOUND).build();
         }
         try {
-            // Determine thumbnail cache directory inside the DB directory
-            String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
-            File thumbDir = new File(dir, "thumbs");
-            thumbDir.mkdirs();
-            String thumbName = src.getName() + "_thumb.jpg";
-            File thumbFile = new File(thumbDir, thumbName);
-            if (!thumbFile.exists()) {
-                // Generate thumbnail (max width 200px) using ImageIO
-                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(src);
-                if (img == null) {
-                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Unable to read image").build();
+            // Check database for cached thumbnail path
+            ImageRecord imgRecord = db.findImageByPath(path);
+            File thumbFile = null;
+            if (imgRecord != null && imgRecord.thumbnail_path != null) {
+                thumbFile = new File(imgRecord.thumbnail_path);
+            }
+            
+            if (thumbFile == null || !thumbFile.exists()) {
+                // Determine thumbnail cache directory inside the DB directory
+                String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
+                File thumbDir = new File(dir, "thumbs");
+                thumbDir.mkdirs();
+                String thumbName = (imgRecord != null ? imgRecord.id : src.getName()) + "_thumb.jpg";
+                thumbFile = new File(thumbDir, thumbName);
+                
+                if (!thumbFile.exists()) {
+                    // Generate a 300px thumbnail using Thumbnailator
+                    net.coobird.thumbnailator.Thumbnails.of(src)
+                            .size(300, 300)
+                            .keepAspectRatio(true)
+                            .outputFormat("jpg")
+                            .toFile(thumbFile);
                 }
-                int w = img.getWidth();
-                int h = img.getHeight();
-                int newW = Math.min(200, w);
-                int newH = (newW * h) / w;
-                java.awt.image.BufferedImage thumb = new java.awt.image.BufferedImage(newW, newH, java.awt.image.BufferedImage.TYPE_INT_RGB);
-                java.awt.Graphics2D g = thumb.createGraphics();
-                g.drawImage(img, 0, 0, newW, newH, null);
-                g.dispose();
-                javax.imageio.ImageIO.write(thumb, "jpg", thumbFile);
+                
+                // Save path to Couchbase Lite document
+                if (imgRecord != null) {
+                    imgRecord.thumbnail_path = thumbFile.getAbsolutePath();
+                    db.save(imgRecord.id, imgRecord);
+                }
             }
             return Response.ok(thumbFile, "image/jpeg").build();
         } catch (Exception e) {

@@ -42,6 +42,7 @@ public class DatabaseRepository {
             SelectResult.property("created_at"),
             SelectResult.property("indexed_at"),
             SelectResult.property("ai_analysed"),
+            SelectResult.property("thumbnail_path"),
             SelectResult.property("type"),
     };
 
@@ -555,6 +556,7 @@ public class DatabaseRepository {
         img.created_at = r.getLong("created_at");
         img.indexed_at = r.getLong("indexed_at");
         img.ai_analysed = r.getBoolean("ai_analysed");
+        img.thumbnail_path = r.getString("thumbnail_path");
         Array arr = r.getArray("tags");
         if (arr != null) {
             List<String> tagList = new ArrayList<>();

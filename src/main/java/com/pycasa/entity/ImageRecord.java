@@ -14,6 +14,7 @@ public class ImageRecord {
     public long created_at;
     public long indexed_at;
     public boolean ai_analysed;
+    public String thumbnail_path;
     public String type = "image";
 
     public ImageRecord() {}

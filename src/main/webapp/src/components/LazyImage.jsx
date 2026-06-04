@@ -12,9 +12,15 @@ export default function LazyImage({ src, alt = '', className = '' }) {
 
 
   return (
-    <div className="relative w-full h-full">
+    <div ref={imgRef} className="relative w-full h-full">
       {url ? (
-        <img ref={imgRef} src={url} alt={alt} className={`${className} w-full h-full object-cover`} />
+        <img
+          src={url}
+          alt={alt}
+          className={`${className} w-full h-full object-cover`}
+          loading="lazy"
+          decoding="async"
+        />
       ) : (
         <div className="absolute inset-0 bg-gray-200 animate-pulse" />
       )}
