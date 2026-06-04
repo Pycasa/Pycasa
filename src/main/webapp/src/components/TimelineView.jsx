@@ -40,43 +40,48 @@ const TimelineView = () => {
     const [metadataLoading, setMetadataLoading] = useState(true);
     const [images, setImages]               = useState([]);
     const [loading, setLoading]             = useState(false);
-    const [selectedImage, setSelectedImage] = useState(null);
+    const [selectedImageIndex, setSelectedImageIndex] = useState(null);
     const [activeKey, setActiveKey]         = useState(null); // "year-month"
-    const [page, setPage]                   = useState(1);
 
     const containerRef  = useRef(null);
     const colCount      = useColumnCount(containerRef);
-    const loadingRef    = useRef(loading);
-    const hasMoreRef    = useRef(false);
-    const pageRef       = useRef(page);
+    const imagesRef     = useRef(images);
+    const requestedPagesRef = useRef(new Set());
 
-    // Keep refs in sync so stable callbacks can read latest values
-    useEffect(() => { loadingRef.current = loading; }, [loading]);
-    useEffect(() => { pageRef.current    = page;    }, [page]);
+    // Keep imagesRef in sync so callbacks can read latest values
+    useEffect(() => { imagesRef.current = images; }, [images]);
+
+    const selectedImage = selectedImageIndex !== null ? images[selectedImageIndex] : null;
+    const setSelectedImage = useCallback((img) => {
+        if (!img) {
+            setSelectedImageIndex(null);
+            return;
+        }
+        const idx = imagesRef.current.findIndex(x => x?.id === img.id);
+        if (idx !== -1) {
+            setSelectedImageIndex(idx);
+        }
+    }, []);
 
     // ── Data fetching ────────────────────────────────────────────────────────
 
     const fetchImages = useCallback(async (pageNum) => {
-        if (loadingRef.current) return;
-        setLoading(true);
         try {
             const limit = 50;
             const newImages = await api.images.list(null, null, null, 'modified_at', 'DESC', pageNum, limit);
             if (Array.isArray(newImages)) {
-                if (pageNum === 1) {
-                    setImages(newImages);
-                } else {
-                    setImages(prev => {
-                        const existingIds = new Set(prev.map(img => img.id));
-                        return [...prev, ...newImages.filter(img => !existingIds.has(img.id))];
+                const startIndex = (pageNum - 1) * limit;
+                setImages(prev => {
+                    const next = [...prev];
+                    newImages.forEach((img, i) => {
+                        next[startIndex + i] = img;
                     });
-                }
-                setPage(pageNum);
+                    return next;
+                });
             }
         } catch (error) {
             console.error('Failed to fetch images:', error);
-        } finally {
-            setLoading(false);
+            requestedPagesRef.current.delete(pageNum);
         }
     }, []);
 
@@ -87,16 +92,16 @@ const TimelineView = () => {
                 const meta = await api.images.getMetadata();
                 setMetadata(meta);
                 setMetadataLoading(false);
+                requestedPagesRef.current.add(1);
                 await fetchImages(1);
             } catch (error) {
                 console.error('Failed to load timeline:', error);
             } finally {
                 setMetadataLoading(false);
-                setLoading(false);
             }
         };
         loadTimeline();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [fetchImages]);
 
     // ── Derived state ────────────────────────────────────────────────────────
 
@@ -105,9 +110,13 @@ const TimelineView = () => {
         [metadata]
     );
 
-    // Keep hasMoreRef in sync so the onChange callback (stable) can read it
-    const hasMore = images.length < totalImageCount;
-    useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
+    // Initialize images sparse array once totalImageCount is known
+    useEffect(() => {
+        if (totalImageCount > 0) {
+            setImages(new Array(totalImageCount).fill(null));
+            requestedPagesRef.current.clear();
+        }
+    }, [totalImageCount]);
 
     /** Slots grouped as year → month → day → [slot] with a global index */
     const groupedSlots = useMemo(() => {
@@ -224,11 +233,27 @@ const TimelineView = () => {
             }
             setActiveKey(newActive);
 
-            // ── Infinite scroll ────────────────────────────────────────────────
-            const lastItem = virtualItems[virtualItems.length - 1];
-            if (lastItem && lastItem.index >= flatRows.length - 8 && hasMoreRef.current && !loadingRef.current) {
-                fetchImages(pageRef.current + 1);
-            }
+            // ── On-Demand Visible Page Loading ───────────────────────────────
+            const limit = 50;
+            const pagesToLoad = new Set();
+            virtualItems.forEach(item => {
+                const row = flatRows[item.index];
+                if (row?.type === 'image-row') {
+                    row.slots.forEach(slot => {
+                        if (!imagesRef.current[slot.index]) {
+                            const pageNum = Math.floor(slot.index / limit) + 1;
+                            pagesToLoad.add(pageNum);
+                        }
+                    });
+                }
+            });
+
+            pagesToLoad.forEach(pageNum => {
+                if (!requestedPagesRef.current.has(pageNum)) {
+                    requestedPagesRef.current.add(pageNum);
+                    fetchImages(pageNum);
+                }
+            });
         },
     });
 
@@ -250,17 +275,21 @@ const TimelineView = () => {
         }
     }, [monthKeyToIndex, rowVirtualizer, groupedSlots]);
 
-    // ── Modal helpers ────────────────────────────────────────────────────────
+    // Trigger page loading if navigating to an unloaded index in the modal
+    useEffect(() => {
+        if (selectedImageIndex !== null && !images[selectedImageIndex]) {
+            const pageNum = Math.floor(selectedImageIndex / 50) + 1;
+            if (!requestedPagesRef.current.has(pageNum)) {
+                requestedPagesRef.current.add(pageNum);
+                fetchImages(pageNum);
+            }
+        }
+    }, [selectedImageIndex, images, fetchImages]);
 
     const modalImage = useMemo(() => {
         if (!selectedImage) return null;
         return { ...selectedImage, full_path: selectedImage.file_path, modified: selectedImage.modified_at };
     }, [selectedImage]);
-
-    const currentImageIndex = useMemo(
-        () => images.findIndex(img => img.id === selectedImage?.id),
-        [images, selectedImage]
-    );
 
     // ── Render ───────────────────────────────────────────────────────────────
 
@@ -440,21 +469,26 @@ const TimelineView = () => {
             {/* ── Image detail modal ───────────────────────────────────────── */}
             <ImageDetailModal
                 image={modalImage}
-                isOpen={!!selectedImage}
-                onClose={() => setSelectedImage(null)}
-                onUpdate={() => fetchImages(1)}
+                isOpen={selectedImageIndex !== null}
+                onClose={() => setSelectedImageIndex(null)}
+                onUpdate={() => {
+                    if (selectedImageIndex !== null) {
+                        const pageNum = Math.floor(selectedImageIndex / 50) + 1;
+                        fetchImages(pageNum);
+                    }
+                }}
                 onNext={() => {
-                    if (currentImageIndex < images.length - 1) {
-                        setSelectedImage(images[currentImageIndex + 1]);
+                    if (selectedImageIndex !== null && selectedImageIndex < images.length - 1) {
+                        setSelectedImageIndex(prev => prev + 1);
                     }
                 }}
                 onPrevious={() => {
-                    if (currentImageIndex > 0) {
-                        setSelectedImage(images[currentImageIndex - 1]);
+                    if (selectedImageIndex !== null && selectedImageIndex > 0) {
+                        setSelectedImageIndex(prev => prev - 1);
                     }
                 }}
-                hasNext={currentImageIndex < images.length - 1}
-                hasPrevious={currentImageIndex > 0}
+                hasNext={selectedImageIndex !== null && selectedImageIndex < images.length - 1}
+                hasPrevious={selectedImageIndex !== null && selectedImageIndex > 0}
             />
         </div>
     );

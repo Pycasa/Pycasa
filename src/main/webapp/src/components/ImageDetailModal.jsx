@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Tag, Info, Trash2, Move, Save, Plus, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Clipboard, Sparkles, Calendar, HardDrive, Image as ImageIcon, Folder as FolderIcon, Eye, EyeOff, ScanText } from 'lucide-react';
+import { Tag, Info, Trash2, Move, Save, Plus, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, Clipboard, Sparkles, Calendar, HardDrive, Image as ImageIcon, Folder as FolderIcon, Eye, EyeOff, ScanText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -284,19 +284,23 @@ const ImageDetailModal = ({ image, isOpen, onClose, onUpdate, onNext, onPrevious
         }
     };
 
-    if (!image) return null;
-
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent hideClose className="max-w-6xl h-[98vh] flex flex-col p-0 gap-0 overflow-hidden">
-                {/* Header (Hidden mostly but good for accessibility/structure) */}
                 <DialogHeader className="sr-only">
-                    <DialogTitle>{image.name}</DialogTitle>
+                    <DialogTitle>{image?.name || 'Loading...'}</DialogTitle>
                     <DialogDescription>Image details and preview</DialogDescription>
                 </DialogHeader>
 
-                {/* Main Content Area: Split View */}
-                <div className="flex-grow flex flex-col md:flex-row h-full overflow-hidden">
+                {!image ? (
+                    <div className="flex-grow flex flex-col items-center justify-center text-white/50 bg-slate-950 min-h-[400px]">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+                        <span>Loading image details...</span>
+                    </div>
+                ) : (
+                    <>
+                        {/* Main Content Area: Split View */}
+                        <div className="flex-grow flex flex-col md:flex-row h-full overflow-hidden">
 
                     {/* Image Preview - Top (mobile) or Left/Center (desktop) */}
                     <div className="flex-grow bg-slate-950 flex items-center justify-center p-4 overflow-hidden relative group">
@@ -514,6 +518,8 @@ const ImageDetailModal = ({ image, isOpen, onClose, onUpdate, onNext, onPrevious
                             </div>
                         </div>
                     </div>
+                )}
+                    </>
                 )}
 
             </DialogContent>
