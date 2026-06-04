@@ -123,51 +123,9 @@ Pycasa uses [Tesseract](https://github.com/tesseract-ocr/tesseract) for text ext
 
 ---
 
-## Project Structure
-
-```
-Pycasa/
-├── src/
-│   └── main/
-│       ├── java/com/pycasa/     # Quarkus backend (Java 17)
-│       │   ├── entity/          # Data models
-│       │   ├── repository/      # Couchbase Lite data access
-│       │   ├── resource/        # REST API endpoints (JAX-RS)
-│       │   └── service/         # Business logic (AI, scanning, OCR)
-│       ├── resources/
-│       │   └── application.properties
-│       └── webapp/              # React frontend (Vite)
-│           └── src/
-│               ├── components/  # UI components
-│               ├── pages/       # Page views
-│               └── lib/         # API client, utilities
-├── pom.xml
-└── Makefile
-```
-
----
-
 ## API
 
 Swagger UI is available at **http://localhost:/docs** when the server is running.
-
-Key endpoints:
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/health` | Health check |
-| `POST` | `/api/auth/login` | Login |
-| `GET` | `/api/folders` | List monitored folders |
-| `POST` | `/api/folders` | Add a folder |
-| `GET` | `/api/images` | List images (supports filtering) |
-| `POST` | `/api/images/scan` | Trigger a folder scan |
-| `GET` | `/api/images/tags` | List all tags |
-| `POST` | `/api/ai/analyze` | Run AI analysis on images |
-| `GET` | `/api/ai/status` | AI analysis progress |
-| `GET` | `/api/settings` | Get settings |
-| `POST` | `/api/settings` | Update settings |
-
----
 
 ## Tech Stack
 
