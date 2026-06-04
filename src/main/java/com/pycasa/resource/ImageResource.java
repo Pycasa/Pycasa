@@ -189,8 +189,10 @@ public class ImageResource {
         FolderScanService.ScanStatus status = scanService.getScanStatus();
         return Response.ok(Map.of(
                 "running", status.running(),
+                "is_scanning", status.running(),
                 "scanned", status.scanned(),
-                "total", status.total()
+                "total", status.total(),
+                "files_found", status.scanned()
         )).build();
     }
 

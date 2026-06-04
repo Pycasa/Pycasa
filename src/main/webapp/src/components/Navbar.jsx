@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, LogOut, Image as ImageIcon, Settings, Calendar, Loader2, Github, Sun, Moon } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAIStatus } from '@/context/AIStatusContext';
+import { useNotifications } from '@/context/NotificationsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import NotificationsBell from '@/components/NotificationsBell';
@@ -69,29 +70,12 @@ const ProfileMenu = ({ username, onLogout }) => {
 
 const Navbar = ({ isAuthenticated, onLogout, username, activeTab }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [filesFound, setFilesFound] = useState(0);
+  const { scanStatus } = useNotifications();
+  const isScanning = scanStatus?.is_scanning || false;
+  const filesFound = scanStatus?.files_found || 0;
   const { aiStatus } = useAIStatus();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
-
-  useEffect(() => {
-    let interval;
-    if (isAuthenticated) {
-      const checkScanStatus = async () => {
-        try {
-          const status = await api.images.getScanStatus();
-          setIsScanning(status.is_scanning);
-          setFilesFound(status.files_found);
-        } catch (error) {
-          console.error('Failed to fetch scan status:', error);
-        }
-      };
-      checkScanStatus();
-      interval = setInterval(checkScanStatus, 2000);
-    }
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
 
   const adminNavItems = [
     { id: 'timeline', label: 'Timeline', icon: Calendar },

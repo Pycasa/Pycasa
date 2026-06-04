@@ -28,9 +28,13 @@ public class AiResource {
         AiService.AnalysisStatus status = aiService.getAnalysisStatus();
         return Response.ok(Map.of(
                 "running", status.running(),
+                "is_running", status.running(),
                 "analysed", status.analysed(),
+                "processed_files", status.analysed(),
                 "total", status.total(),
-                "status", status.status()
+                "total_files", status.total(),
+                "status", status.status(),
+                "current_file", status.currentFile() != null ? status.currentFile() : ""
         )).build();
     }
 
