@@ -208,6 +208,13 @@ const TimelineSlider = ({ groupedSlots, years, activeKey, onNavigate }) => {
                     border-radius: 9999px !important;
                     transition: width 0.2s ease;
                 }
+                .dark .timeline-scrubber-container .scrubber .bar {
+                    background-color: #334155 !important; /* slate-700 */
+                }
+                .dark .timeline-sidebar {
+                    background-color: #1e2229 !important; /* slate-900/85 */
+                    border-color: #1e293b !important; /* slate-800 */
+                }
                 .timeline-scrubber-container .scrubber.vertical .bar {
                     width: 4px !important;
                 }
@@ -224,6 +231,9 @@ const TimelineSlider = ({ groupedSlots, years, activeKey, onNavigate }) => {
                     width: 10px !important;
                     height: 10px !important;
                     transition: width 0.15s ease, height 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease !important;
+                }
+                .dark .timeline-scrubber-container .scrubber .bar__thumb {
+                    border: 2px solid #0f172a !important; /* slate-900 */
                 }
                 .timeline-scrubber-container .scrubber.hover .bar__thumb {
                     width: 14px !important;
@@ -281,10 +291,10 @@ const TimelineSlider = ({ groupedSlots, years, activeKey, onNavigate }) => {
 
                     const yearIdx = years.indexOf(String(tick.year));
                     const activeColorClass = 
-                        yearIdx % 4 === 0 ? 'text-indigo-600' :
-                        yearIdx % 4 === 1 ? 'text-sky-600' :
-                        yearIdx % 4 === 2 ? 'text-emerald-600' :
-                                            'text-rose-600';
+                        yearIdx % 4 === 0 ? 'text-indigo-600 dark:text-indigo-400' :
+                        yearIdx % 4 === 1 ? 'text-sky-600 dark:text-sky-400' :
+                        yearIdx % 4 === 2 ? 'text-emerald-600 dark:text-emerald-400' :
+                                            'text-rose-600 dark:text-rose-400';
 
                     const labelText = tick.type === 'day' 
                         ? `${tick.day} ${tick.label} ${tick.year}` 
@@ -628,7 +638,7 @@ const TimelineView = () => {
     const totalSize    = rowVirtualizer.getTotalSize();
 
     return (
-        <div className="relative flex h-[calc(100vh-4rem)] bg-white overflow-hidden">
+        <div className="relative flex h-[calc(100vh-4rem)] bg-white dark:bg-slate-950 overflow-hidden">
 
             {/* ── Scrollable timeline area ─────────────────────────────────── */}
             <div
@@ -726,7 +736,7 @@ const TimelineView = () => {
 
             {/* ── Right sidebar — M3 Timeline Slider ──────────────────────── */}
             <div
-                className="absolute right-0 top-0 bottom-0 flex items-stretch bg-white/80 backdrop-blur-sm border-l border-slate-100"
+                className="absolute right-0 top-0 bottom-0 flex items-stretch bg-white/80 backdrop-blur-sm border-l border-slate-100 dark:border-slate-800 timeline-sidebar"
                 style={{ zIndex: 10 }}
             >
                 <TimelineSlider

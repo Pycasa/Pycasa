@@ -58,9 +58,12 @@ public class FolderScanService {
                 File dir = new File(folder.path);
                 if (!dir.exists() || !dir.isDirectory()) {
                     LOG.warnf("Folder does not exist or is not a directory: %s", folder.path);
+                    // Since the folder no longer exists physically, remove all its image records from the database
+                    db.deleteImagesByFolderId(folder.id);
                     continue;
                 }
                 scanDirectory(dir, folder.id);
+                cleanupDeletedImages(folder.id);
             }
             int finalCount = scanned.get();
             LOG.infof("Scan complete. Indexed %d images.", finalCount);
@@ -70,6 +73,28 @@ public class FolderScanService {
             notificationService.scanError(e.getMessage());
         } finally {
             scanning.set(false);
+        }
+    }
+
+    private void cleanupDeletedImages(String folderId) {
+        try {
+            List<ImageRecord> dbImages = db.listImages(folderId, null, null, null, null, 1, 1000000);
+            int deletedCount = 0;
+            for (ImageRecord img : dbImages) {
+                if (img.file_path != null) {
+                    File file = new File(img.file_path);
+                    if (!file.exists()) {
+                        db.delete(img.id);
+                        deletedCount++;
+                        LOG.infof("Deleted image record from database because file was removed: %s", img.file_path);
+                    }
+                }
+            }
+            if (deletedCount > 0) {
+                LOG.infof("Cleaned up %d stale image records for folder %s", deletedCount, folderId);
+            }
+        } catch (Exception e) {
+            LOG.warnf("Failed to perform cleanup of deleted images for folder %s: %s", folderId, e.getMessage());
         }
     }
 

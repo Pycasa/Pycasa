@@ -134,6 +134,7 @@
 
 /* Semi-transparent whites */
 .dark .bg-white\/50      { background-color: hsla(220, 15%, 14%, 0.8) !important; }
+.dark .bg-white\/80      { background-color: hsla(220, 15%, 14%, 0.85) !important; }
 .dark .bg-white\/10      { background-color: hsla(220, 15%, 14%, 0.3) !important; }
 .dark .bg-slate-50\/50   { background-color: hsla(220, 15%, 12%, 0.5) !important; }
 
