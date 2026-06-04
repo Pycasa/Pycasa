@@ -6,15 +6,20 @@ import com.pycasa.service.FolderScanService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
+import org.jboss.logging.Logger;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 
 import java.io.File;
 import java.util.*;
+
+
 
 @Path("/api/folders")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class FolderResource {
+    private static final Logger LOG = Logger.getLogger(FolderResource.class);
 
     @Inject
     DatabaseRepository db;
@@ -29,7 +34,24 @@ public class FolderResource {
 
     @GET
     public Response listFolders() {
-        return Response.ok(db.listFolders()).build();
+        try {
+            // Retrieve folders
+            List<MonitoredFolder> folders = db.listFolders();
+            // Populate image counts for each folder
+            for (MonitoredFolder f : folders) {
+                try {
+                    long cnt = db.countImagesByFolderId(f.id);
+                    f.imageCount = cnt;
+                } catch (Exception e) {
+                    LOG.warnf("Failed to count images for folder %s: %s", f.id, e.getMessage());
+                    f.imageCount = 0L;
+                }
+            }
+            return Response.ok(folders).build();
+        } catch (Exception e) {
+            LOG.warn("listFolders failed: " + e.getMessage());
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(Map.of("error", "Failed to list folders")).build();
+        }
     }
 
     @POST

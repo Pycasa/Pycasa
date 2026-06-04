@@ -429,6 +429,35 @@ public class DatabaseRepository {
         }
     }
 
+    public long countImagesByFolderId(String folderId) {
+        try {
+            Query q = QueryBuilder.select(SelectResult.expression(Function.count(Expression.string("*"))))
+                    .from(DataSource.collection(defaultCollection))
+                    .where(Expression.property("type").equalTo(Expression.string("image"))
+                            .and(Expression.property("folder_id").equalTo(Expression.string(folderId))));
+            ResultSet rs = q.execute();
+            List<Result> results = rs.allResults();
+            return results.isEmpty() ? 0 : results.get(0).getLong(0);
+        } catch (Exception e) {
+            LOG.warnf("countImagesByFolderId failed: %s", e.getMessage());
+            return 0;
+        }
+    }
+
+    public long countAllImages() {
+        try {
+            Query q = QueryBuilder.select(SelectResult.expression(Function.count(Expression.string("*"))))
+                    .from(DataSource.collection(defaultCollection))
+                    .where(Expression.property("type").equalTo(Expression.string("image")));
+            ResultSet rs = q.execute();
+            List<Result> results = rs.allResults();
+            return results.isEmpty() ? 0 : results.get(0).getLong(0);
+        } catch (Exception e) {
+            LOG.warnf("countAllImages failed: %s", e.getMessage());
+            return 0;
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Notification queries
     // -------------------------------------------------------------------------

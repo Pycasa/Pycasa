@@ -3,7 +3,9 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { api } from '@/lib/api';
 import ImageCard from './ImageCard';
 import ImageDetailModal from './ImageDetailModal';
-import { Loader2, Calendar } from 'lucide-react';
+import { Calendar, Loader2 } from 'lucide-react';
+import { Scrubber } from 'react-scrubber';
+import 'react-scrubber/lib/scrubber.css';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -33,6 +35,317 @@ function useColumnCount(containerRef) {
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
     return cols;
 }
+
+/* ── M3-style vertical timeline slider ──────────────────────────────────── */
+
+const TimelineSlider = ({ groupedSlots, years, activeKey, onNavigate }) => {
+    const [hoverPercent, setHoverPercent] = useState(null);
+    const [isHovering, setIsHovering] = useState(false);
+
+    const handleMouseMoveTrack = useCallback((e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const percent = Math.max(0, Math.min(100, (y / rect.height) * 100));
+        setHoverPercent(percent);
+    }, []);
+
+    const handleMouseEnterTrack = useCallback(() => {
+        setIsHovering(true);
+    }, []);
+
+    const handleMouseLeaveTrack = useCallback(() => {
+        setIsHovering(false);
+    }, []);
+
+    // Build tick marks: year headers + month entries + day entries
+    const ticks = useMemo(() => {
+        if (!years.length) return [];
+        const items = [];
+        years.forEach(year => {
+            const y = +year;
+            const months = Object.keys(groupedSlots[year] || {}).sort((a, b) => +b - +a);
+            months.forEach(month => {
+                const m = +month;
+                // 1. Month entry
+                items.push({
+                    type: 'month',
+                    year: y,
+                    month: m,
+                    key: `${y}-${m}`,
+                    label: MONTH_NAMES[m],
+                    isFirstOfYear: months[0] === month,
+                });
+
+                // 2. Day entries for this month
+                const days = Object.keys(groupedSlots[year][month] || {}).sort((a, b) => +b - +a);
+                days.forEach(day => {
+                    const d = +day;
+                    items.push({
+                        type: 'day',
+                        year: y,
+                        month: m,
+                        day: d,
+                        key: `${y}-${m}-${d}`,
+                        label: MONTH_NAMES[m],
+                        isFirstOfYear: false,
+                    });
+                });
+            });
+        });
+        return items;
+    }, [years, groupedSlots]);
+
+    const activeIndex = useMemo(() => {
+        return ticks.findIndex(t => t.key === activeKey);
+    }, [ticks, activeKey]);
+
+    const hoverIndex = useMemo(() => {
+        if (!isHovering || hoverPercent === null || !ticks.length) return -1;
+        return Math.max(0, Math.min(ticks.length - 1, Math.round((hoverPercent / 100) * (ticks.length - 1))));
+    }, [hoverPercent, isHovering, ticks]);
+
+    const activeYearIdx = useMemo(() => {
+        if (activeIndex === -1) return 0;
+        const activeTick = ticks[activeIndex];
+        return Math.max(0, years.indexOf(String(activeTick.year)));
+    }, [ticks, activeIndex, years]);
+
+    const thumbStyle = useMemo(() => {
+        const colors = [
+            { main: '#6366f1', shadow: 'rgba(99, 102, 241, 0.4)' }, // Indigo
+            { main: '#0ea5e9', shadow: 'rgba(14, 165, 233, 0.4)' }, // Sky
+            { main: '#10b981', shadow: 'rgba(16, 185, 129, 0.4)' }, // Emerald
+            { main: '#f43f5e', shadow: 'rgba(244, 63, 94, 0.4)' }   // Rose
+        ];
+        const activeColor = colors[activeYearIdx % 4] || colors[0];
+        return {
+            '--thumb-color': activeColor.main,
+            '--thumb-shadow': activeColor.shadow
+        };
+    }, [activeYearIdx]);
+
+    const scrubberMarkers = useMemo(() => {
+        const list = [];
+        
+        // 1. Add ranges for each year
+        years.forEach((year, yearIdx) => {
+            const y = +year;
+            const yearTickIndices = [];
+            ticks.forEach((tick, idx) => {
+                if (tick.year === y) {
+                    yearTickIndices.push(idx);
+                }
+            });
+            if (yearTickIndices.length > 0) {
+                const firstIdx = yearTickIndices[0]; // newest (closer to top of list, i.e. higher scrubber value)
+                const lastIdx = yearTickIndices[yearTickIndices.length - 1]; // oldest (closer to bottom of list, i.e. lower scrubber value)
+                
+                const startVal = ticks.length - 1 - lastIdx;
+                const endVal = ticks.length - 1 - firstIdx;
+                
+                list.push({
+                    start: startVal,
+                    end: endVal,
+                    className: `year-range year-range-${yearIdx % 4}`
+                });
+            }
+        });
+
+        // 2. Add points for each month and day
+        ticks.forEach((tick, idx) => {
+            const scrubberVal = ticks.length - 1 - idx;
+            if (tick.type === 'month') {
+                list.push({
+                    start: scrubberVal,
+                    className: tick.isFirstOfYear ? 'first-of-year-point' : 'normal-point'
+                });
+            } else {
+                list.push({
+                    start: scrubberVal,
+                    className: 'day-point'
+                });
+            }
+        });
+
+        return list;
+    }, [ticks, years]);
+
+    const handleScrubChange = useCallback((val) => {
+        const idx = ticks.length - 1 - Math.round(val);
+        const tick = ticks[idx];
+        if (tick) {
+            onNavigate(tick.key, false); // false = instant scroll
+        }
+    }, [ticks, onNavigate]);
+
+    const handleScrubEnd = useCallback((val) => {
+        const idx = ticks.length - 1 - Math.round(val);
+        const tick = ticks[idx];
+        if (tick) {
+            onNavigate(tick.key, true); // true = smooth scroll to final position
+        }
+    }, [ticks, onNavigate]);
+
+    if (!ticks.length) return null;
+
+    return (
+        <div 
+            className="timeline-scrubber-container flex items-stretch h-full py-5 select-none" 
+            style={{ width: 96, ...thumbStyle }}
+        >
+            {/* Custom stylesheet override for react-scrubber to match Pycasa theme */}
+            <style>{`
+                .timeline-scrubber-container,
+                .timeline-scrubber-container .scrubber,
+                .timeline-scrubber-container .scrubber * {
+                    cursor: ns-resize !important;
+                }
+                .timeline-scrubber-container .scrubber {
+                    height: 100% !important;
+                }
+                .timeline-scrubber-container .scrubber .bar {
+                    background-color: #f1f5f9 !important; /* slate-100 */
+                    border-radius: 9999px !important;
+                    transition: width 0.2s ease;
+                }
+                .timeline-scrubber-container .scrubber.vertical .bar {
+                    width: 4px !important;
+                }
+                .timeline-scrubber-container .scrubber.hover.vertical .bar {
+                    width: 6px !important;
+                }
+                .timeline-scrubber-container .scrubber .bar__progress {
+                    background-color: transparent !important; /* hide the progress bar to show year range gradients fully */
+                }
+                .timeline-scrubber-container .scrubber .bar__thumb {
+                    background-color: var(--thumb-color, #6366f1) !important;
+                    border: 2px solid #ffffff !important;
+                    box-shadow: 0 4px 6px -1px var(--thumb-shadow, rgb(99 102 241 / 0.4)), 0 2px 4px -2px var(--thumb-shadow, rgb(99 102 241 / 0.4)) !important;
+                    width: 10px !important;
+                    height: 10px !important;
+                    transition: width 0.15s ease, height 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease !important;
+                }
+                .timeline-scrubber-container .scrubber.hover .bar__thumb {
+                    width: 14px !important;
+                    height: 14px !important;
+                }
+                
+                /* Range styling */
+                .timeline-scrubber-container .scrubber .bar__marker.year-range {
+                    width: 100% !important;
+                    border-radius: 2px !important;
+                }
+                .timeline-scrubber-container .scrubber .bar__marker.year-range-0 {
+                    background: linear-gradient(to bottom, #818cf8, #4f46e5) !important; /* Indigo gradient */
+                }
+                .timeline-scrubber-container .scrubber .bar__marker.year-range-1 {
+                    background: linear-gradient(to bottom, #38bdf8, #0284c7) !important; /* Sky Blue gradient */
+                }
+                .timeline-scrubber-container .scrubber .bar__marker.year-range-2 {
+                    background: linear-gradient(to bottom, #34d399, #059669) !important; /* Emerald gradient */
+                }
+                .timeline-scrubber-container .scrubber .bar__marker.year-range-3 {
+                    background: linear-gradient(to bottom, #fb7185, #e11d48) !important; /* Rose gradient */
+                }
+
+                /* Point styling */
+                .timeline-scrubber-container .scrubber .bar__marker.normal-point {
+                    background-color: rgba(255, 255, 255, 0.4) !important;
+                    height: 1px !important;
+                    width: 100% !important;
+                    transform: translateY(50%) !important;
+                }
+                .timeline-scrubber-container .scrubber .bar__marker.first-of-year-point {
+                    background-color: rgba(255, 255, 255, 0.85) !important;
+                    height: 2px !important;
+                    width: 100% !important;
+                    transform: translateY(50%) !important;
+                }
+                .timeline-scrubber-container .scrubber .bar__marker.day-point {
+                    background-color: rgba(255, 255, 255, 0.25) !important;
+                    height: 1px !important;
+                    width: 60% !important; /* Slightly shorter than month lines to make a nice ruler hierarchy */
+                    transform: translateY(50%) !important;
+                }
+            `}</style>
+
+            {/* Left side: Month & Year Labels */}
+            <div className="relative flex-1 mr-3 h-full">
+                {ticks.map((tick, idx) => {
+                    const isActive = idx === activeIndex;
+                    const isHoverActive = idx === hoverIndex;
+                    const percent = ticks.length > 1 ? (idx / (ticks.length - 1)) * 100 : 0;
+                    
+                    const isVisible = tick.type === 'month' || isActive || isHoverActive;
+                    if (!isVisible) return null;
+
+                    const yearIdx = years.indexOf(String(tick.year));
+                    const activeColorClass = 
+                        yearIdx % 4 === 0 ? 'text-indigo-600' :
+                        yearIdx % 4 === 1 ? 'text-sky-600' :
+                        yearIdx % 4 === 2 ? 'text-emerald-600' :
+                                            'text-rose-600';
+
+                    const labelText = tick.type === 'day' 
+                        ? `${tick.day} ${tick.label} ${tick.year}` 
+                        : `${tick.label} ${tick.year}`;
+
+                    return (
+                        <div
+                            key={tick.key}
+                            className="absolute right-0 -translate-y-1/2 flex items-center pointer-events-none transition-all duration-200"
+                            style={{ top: `${percent}%` }}
+                        >
+                            <span
+                                className={`
+                                    whitespace-nowrap transition-all duration-150
+                                    ${tick.type === 'day' ? 'text-[9px]' : 'text-[10px]'}
+                                    ${isActive
+                                        ? `${activeColorClass} font-bold scale-105`
+                                        : isHoverActive
+                                            ? 'text-slate-700 font-semibold scale-102'
+                                            : 'text-slate-400 font-medium'
+                                    }
+                                `}
+                            >
+                                {labelText}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Right side: Scrubber bar */}
+            <div 
+                className="relative w-8 h-full flex justify-center py-1 cursor-ns-resize"
+                onMouseMove={handleMouseMoveTrack}
+                onMouseEnter={handleMouseEnterTrack}
+                onMouseLeave={handleMouseLeaveTrack}
+            >
+                <Scrubber
+                    min={0}
+                    max={ticks.length - 1}
+                    value={activeIndex === -1 ? ticks.length - 1 : ticks.length - 1 - activeIndex}
+                    vertical
+                    markers={scrubberMarkers}
+                    onScrubChange={handleScrubChange}
+                    onScrubEnd={handleScrubEnd}
+                />
+
+                {/* Horizontal line showing pointer position - rendered after Scrubber to stack on top */}
+                {isHovering && hoverPercent !== null && (
+                    <div 
+                        className="absolute right-0 left-0 h-[2px] bg-indigo-500/80 pointer-events-none z-50"
+                        style={{ 
+                            top: `${hoverPercent}%`,
+                            transform: 'translateY(-50%)'
+                        }}
+                    />
+                )}
+            </div>
+        </div>
+    );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 const TimelineView = () => {
@@ -131,8 +444,8 @@ const TimelineView = () => {
             const year  = date.getFullYear();
             const month = date.getMonth();
             const day   = date.getDate();
-            if (!groups[year])          groups[year]          = {};
-            if (!groups[year][month])   groups[year][month]   = {};
+            if (!groups[year])            groups[year]          = {};
+            if (!groups[year][month])     groups[year][month]   = {};
             if (!groups[year][month][day]) groups[year][month][day] = [];
             for (let i = 0; i < count; i++) {
                 groups[year][month][day].push({ index: globalIndex++, dateStr, year, month, day });
@@ -178,11 +491,26 @@ const TimelineView = () => {
         return rows;
     }, [groupedSlots, years, colCount]);
 
-    /** Fast lookup: "year-month" → flat row index (for scrollToIndex) */
+    /** Fast lookup: "year-month" or "year-month-day" → flat row index (for scrollToIndex) */
     const monthKeyToIndex = useMemo(() => {
         const map = {};
         flatRows.forEach((row, i) => {
-            if (row.type === 'month-header') map[`${row.year}-${row.month}`] = i;
+            if (row.type === 'month-header') {
+                map[`${row.year}-${row.month}`] = i;
+            } else if (row.type === 'day-header') {
+                map[`${row.year}-${row.month}-${row.day}`] = i;
+            }
+        });
+        return map;
+    }, [flatRows]);
+
+    /** Fast lookup: year → flat row index of year-header */
+    const yearToIndex = useMemo(() => {
+        const map = {};
+        flatRows.forEach((row, i) => {
+            if (row.type === 'year-header' && !(row.year in map)) {
+                map[row.year] = i;
+            }
         });
         return map;
     }, [flatRows]);
@@ -199,12 +527,11 @@ const TimelineView = () => {
                 case 'year-header':  return 72;
                 case 'month-header': return 48;
                 case 'day-header':   return 52;
-                case 'image-row':    return 180; // rough estimate; measureElement overrides
+                case 'image-row':    return 180;
                 default:             return 200;
             }
         },
         overscan: 4,
-        // measureElement lets the virtualizer read actual DOM heights on first render
         measureElement: (el) => el?.getBoundingClientRect().height ?? 200,
         onChange: (instance) => {
             const virtualItems = instance.getVirtualItems();
@@ -214,19 +541,21 @@ const TimelineView = () => {
             const scrollTop = containerRef.current?.scrollTop ?? 0;
             let newActive = null;
 
-            // Walk visible items; track last month-header whose top is above viewport midpoint
             for (const item of virtualItems) {
                 const row = flatRows[item.index];
-                if (row?.type === 'month-header' && item.start <= scrollTop + 80) {
-                    newActive = `${row.year}-${row.month}`;
+                if ((row?.type === 'month-header' || row?.type === 'day-header') && item.start <= scrollTop + 80) {
+                    newActive = row.type === 'day-header' 
+                        ? `${row.year}-${row.month}-${row.day}` 
+                        : `${row.year}-${row.month}`;
                 }
             }
-            // If nothing matched yet, scan backwards from the first visible item
             if (!newActive) {
                 for (let i = (virtualItems[0]?.index ?? 0) - 1; i >= 0; i--) {
                     const row = flatRows[i];
-                    if (row?.type === 'month-header') {
-                        newActive = `${row.year}-${row.month}`;
+                    if (row?.type === 'month-header' || row?.type === 'day-header') {
+                        newActive = row.type === 'day-header'
+                            ? `${row.year}-${row.month}-${row.day}`
+                            : `${row.year}-${row.month}`;
                         break;
                     }
                 }
@@ -259,21 +588,15 @@ const TimelineView = () => {
 
     // ── Navigation ───────────────────────────────────────────────────────────
 
-    const scrollToMonth = useCallback((year, month) => {
-        const key = `${year}-${month}`;
-        const idx = monthKeyToIndex[key];
-        if (idx !== undefined) {
-            rowVirtualizer.scrollToIndex(idx, { align: 'start', behavior: 'smooth' });
-            return;
+    const handleNavigateToMonth = useCallback((monthKey, smooth = true) => {
+        const index = monthKeyToIndex[monthKey];
+        if (index !== undefined) {
+            rowVirtualizer.scrollToIndex(index, { 
+                align: 'start', 
+                behavior: smooth ? 'smooth' : 'auto' 
+            });
         }
-        // Fallback: closest available month
-        const available = Object.keys(groupedSlots[year] || {}).map(Number).sort((a, b) => b - a);
-        const nearest   = available.find(m => m <= month) ?? available[available.length - 1];
-        if (nearest !== undefined) {
-            const fi = monthKeyToIndex[`${year}-${nearest}`];
-            if (fi !== undefined) rowVirtualizer.scrollToIndex(fi, { align: 'start', behavior: 'smooth' });
-        }
-    }, [monthKeyToIndex, rowVirtualizer, groupedSlots]);
+    }, [monthKeyToIndex, rowVirtualizer]);
 
     // Trigger page loading if navigating to an unloaded index in the modal
     useEffect(() => {
@@ -311,7 +634,7 @@ const TimelineView = () => {
             <div
                 ref={containerRef}
                 className="flex-grow overflow-y-auto no-scrollbar"
-                style={{ paddingRight: '4rem' /* make room for the fixed 64px sidebar */ }}
+                style={{ paddingRight: '6.5rem' /* make room for the fixed 96px sidebar */ }}
             >
                 {years.length > 0 ? (
                     <div style={{ height: totalSize, position: 'relative' }}>
@@ -395,75 +718,23 @@ const TimelineView = () => {
                         })}
                     </div>
                 ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                        <Calendar className="w-12 h-12 mb-4 opacity-20" />
-                        <p className="text-lg font-medium">No images found in your timeline.</p>
-                        <p className="text-sm">Try adding more folders in Settings.</p>
-                    </div>
-                )}
-
-                {loading && images.length > 0 && (
-                    <div className="py-8 flex justify-center">
-                        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                    <div className="flex items-center justify-center h-full text-slate-400">
+                        No photos found.
                     </div>
                 )}
             </div>
 
-            {/* ── Fixed right sidebar ──────────────────────────────────────── */}
-            <div className="absolute right-0 top-0 bottom-0 w-16 z-30 flex flex-col bg-slate-50 border-l border-slate-100 overflow-y-auto no-scrollbar select-none">
-                <div className="flex flex-col items-center py-8 gap-8 flex-1">
-                    {years.map(year => (
-                        <div key={`nav-${year}`} className="flex flex-col items-center gap-2">
-                            {/* Year button */}
-                            <div className="flex flex-col items-center gap-1.5 mb-1">
-                                <button
-                                    onClick={() => scrollToMonth(year, 11)}
-                                    className={`text-[11px] font-black transition-all ${
-                                        activeKey?.startsWith(String(year))
-                                            ? 'text-primary scale-110'
-                                            : 'text-slate-400 hover:text-slate-600'
-                                    }`}
-                                >
-                                    {year}
-                                </button>
-                                <div className={`w-10 h-1.5 rounded-full transition-all ${
-                                    activeKey?.startsWith(String(year))
-                                        ? 'bg-primary shadow-[0_0_8px_rgba(26,67,50,0.3)]'
-                                        : 'bg-slate-200'
-                                }`} />
-                            </div>
-
-                            {/* Month markers (Dec → Jan) */}
-                            <div className="flex flex-col gap-1.5">
-                                {[11,10,9,8,7,6,5,4,3,2,1,0].map(m => {
-                                    const hasImages = groupedSlots[year]?.[m] &&
-                                        Object.keys(groupedSlots[year][m]).length > 0;
-                                    const isActive  = activeKey === `${year}-${m}`;
-                                    return (
-                                        <div
-                                            key={`nav-${year}-${m}`}
-                                            className="group relative flex items-center justify-center"
-                                        >
-                                            <button
-                                                onClick={() => scrollToMonth(year, m)}
-                                                className={`h-1 rounded-full transition-all flex-shrink-0 ${
-                                                    isActive
-                                                        ? 'w-8 h-1.5 bg-primary shadow-[0_0_10px_rgba(26,67,50,0.2)]'
-                                                        : hasImages
-                                                            ? 'w-5 bg-primary/30 hover:bg-primary/60 hover:w-7'
-                                                            : 'w-5 bg-slate-200/50 hover:bg-slate-300 hover:w-7'
-                                                }`}
-                                            />
-                                            <span className="absolute right-full mr-3 px-2.5 py-1.5 rounded-lg bg-slate-900/90 backdrop-blur-sm text-white text-[10px] whitespace-nowrap opacity-0 pointer-events-none transition-all translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 z-40 shadow-xl border border-white/10 font-medium">
-                                                {MONTH_NAMES[m]} {year}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+            {/* ── Right sidebar — M3 Timeline Slider ──────────────────────── */}
+            <div
+                className="absolute right-0 top-0 bottom-0 flex items-stretch bg-white/80 backdrop-blur-sm border-l border-slate-100"
+                style={{ zIndex: 10 }}
+            >
+                <TimelineSlider
+                    groupedSlots={groupedSlots}
+                    years={years}
+                    activeKey={activeKey}
+                    onNavigate={handleNavigateToMonth}
+                />
             </div>
 
             {/* ── Image detail modal ───────────────────────────────────────── */}

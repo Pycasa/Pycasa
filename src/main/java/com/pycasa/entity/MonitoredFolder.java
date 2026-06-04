@@ -6,6 +6,7 @@ public class MonitoredFolder {
     public String label;
     public String type = "folder";
     public long createdAt;
+    public long imageCount;
 
     public MonitoredFolder() {}
 
