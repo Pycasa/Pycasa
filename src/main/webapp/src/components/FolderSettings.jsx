@@ -427,34 +427,44 @@ const FolderSettings = () => {
                                 <p className="text-sm">Add a folder path above to start scanning for images.</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-4">
-                                {monitoredFolders.map((folder) => (
-                                    <Card key={folder.id} className="p-4 flex items-center justify-between group bg-white hover:border-primary/50 transition-colors">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
-                                                <Folder className="w-6 h-6" />
+                            <div className="space-y-4">
+                                <div className="text-sm text-slate-600 font-medium">
+                                    Total images: {monitoredFolders.reduce((sum, f) => sum + (f.imageCount || 0), 0)}
+                                </div>
+                                <div className="grid grid-cols-1 gap-4">
+                                    {monitoredFolders.map((folder) => (
+                                        <Card key={folder.id} className="p-4 flex items-center justify-between group bg-white hover:border-primary/50 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
+                                                    <Folder className="w-6 h-6" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold text-slate-900">{folder.label || folder.name}</h4>
+                                                    <p className="text-xs text-slate-500 font-mono">{folder.path}</p>
+                                                    {typeof folder.imageCount === 'number' && (
+                                                        <div className="mt-1 text-xs text-gray-600">
+                                                            Images: {folder.imageCount}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900">{folder.label || folder.name}</h4>
-                                                <p className="text-xs text-slate-500 font-mono">{folder.path}</p>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full uppercase tracking-wider">
+                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    Active
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleRemoveFolder(folder.id)}
+                                                    className="text-slate-400 hover:text-red-500 transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full uppercase tracking-wider">
-                                                <CheckCircle2 className="w-3 h-3" />
-                                                Active
-                                            </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleRemoveFolder(folder.id)}
-                                                className="text-slate-400 hover:text-red-500 transition-colors"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </Card>
-                                ))}
+                                        </Card>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>

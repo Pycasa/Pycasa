@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import React, { createContext, useContext } from 'react';
+import { useNotifications } from '@/context/NotificationsContext';
 
 const AIStatusContext = createContext();
 
@@ -12,24 +12,7 @@ export const useAIStatus = () => {
 };
 
 export const AIStatusProvider = ({ children }) => {
-    const [aiStatus, setAiStatus] = useState(null);
-
-    useEffect(() => {
-        let interval;
-        const checkAiStatus = async () => {
-            try {
-                const status = await api.ai.getAnalysisStatus();
-                setAiStatus(status);
-            } catch (error) {
-                console.error("Failed to fetch AI status:", error);
-            }
-        };
-
-        checkAiStatus();
-        interval = setInterval(checkAiStatus, 1000);
-
-        return () => clearInterval(interval);
-    }, []);
+    const { aiStatus } = useNotifications();
 
     return (
         <AIStatusContext.Provider value={{ aiStatus }}>

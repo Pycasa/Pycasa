@@ -37,7 +37,7 @@ public class ImageResource {
             @QueryParam("sort_by") @DefaultValue("modified_at") String sortBy,
             @QueryParam("sort_order") @DefaultValue("DESC") String sortOrder,
             @QueryParam("page") @DefaultValue("1") int page,
-            @QueryParam("limit") @DefaultValue("30") int limit) {
+            @QueryParam("limit") @DefaultValue("30") int limit, @QueryParam("before") String before) {
 
         List<String> tagList = (tags != null && !tags.isBlank())
                 ? Arrays.asList(tags.split(","))
@@ -56,6 +56,9 @@ public class ImageResource {
     @GET
     @Path("/metadata")
     public Response getMetadata(@QueryParam("path") String path, @QueryParam("id") String id) {
+        if (path == null && id == null) {
+            return Response.ok(db.getImageDateCounts()).build();
+        }
         ImageRecord img = null;
         if (id != null) img = db.get(id, ImageRecord.class);
         if (img == null && path != null) img = db.findImageByPath(path);
@@ -186,8 +189,10 @@ public class ImageResource {
         FolderScanService.ScanStatus status = scanService.getScanStatus();
         return Response.ok(Map.of(
                 "running", status.running(),
+                "is_scanning", status.running(),
                 "scanned", status.scanned(),
-                "total", status.total()
+                "total", status.total(),
+                "files_found", status.scanned()
         )).build();
     }
 
@@ -219,4 +224,52 @@ public class ImageResource {
             return Response.serverError().build();
         }
     }
-}
+    @GET
+    @Path("/thumbnail")
+    @Produces("image/jpeg")
+    public Response getThumbnail(@QueryParam("path") String path) {
+        if (path == null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+        File src = new File(path);
+        if (!src.exists()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        try {
+            // Check database for cached thumbnail path
+            ImageRecord imgRecord = db.findImageByPath(path);
+            File thumbFile = null;
+            if (imgRecord != null && imgRecord.thumbnail_path != null) {
+                thumbFile = new File(imgRecord.thumbnail_path);
+            }
+            
+            if (thumbFile == null || !thumbFile.exists()) {
+                // Determine thumbnail cache directory inside the DB directory
+                String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
+                File thumbDir = new File(dir, "thumbs");
+                thumbDir.mkdirs();
+                String thumbName = (imgRecord != null ? imgRecord.id : src.getName()) + "_thumb.jpg";
+                thumbFile = new File(thumbDir, thumbName);
+                
+                if (!thumbFile.exists()) {
+                    // Generate a 300px thumbnail using Thumbnailator
+                    net.coobird.thumbnailator.Thumbnails.of(src)
+                            .size(300, 300)
+                            .keepAspectRatio(true)
+                            .outputFormat("jpg")
+                            .toFile(thumbFile);
+                }
+                
+                // Save path to Couchbase Lite document
+                if (imgRecord != null) {
+                    imgRecord.thumbnail_path = thumbFile.getAbsolutePath();
+                    db.save(imgRecord.id, imgRecord);
+                }
+            }
+            return Response.ok(thumbFile, "image/jpeg").build();
+        } catch (Exception e) {
+            LOG.warnf("Failed to generate thumbnail for %s: %s", path, e.getMessage());
+            return Response.serverError().build();
+        }
+    }
+    }

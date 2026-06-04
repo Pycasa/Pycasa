@@ -32,6 +32,7 @@ public class FolderScanService {
     private final AtomicBoolean scanning = new AtomicBoolean(false);
     private final AtomicInteger scanned = new AtomicInteger(0);
     private final AtomicInteger total = new AtomicInteger(0);
+    private final java.util.concurrent.atomic.AtomicLong lastProgressBroadcast = new java.util.concurrent.atomic.AtomicLong(0);
 
     public record ScanStatus(boolean running, int scanned, int total) {}
 
@@ -50,6 +51,7 @@ public class FolderScanService {
             List<MonitoredFolder> folders = db.listFolders();
             scanned.set(0);
             total.set(0);
+            lastProgressBroadcast.set(0);
             notificationService.scanStarted();
 
             for (MonitoredFolder folder : folders) {
@@ -118,7 +120,12 @@ public class FolderScanService {
 
             int s = scanned.get();
             int t = total.get();
-            notificationService.scanProgress(s, t, file.getFileName().toString());
+            long now = System.currentTimeMillis();
+            long last = lastProgressBroadcast.get();
+            if (now - last > 500 || s == t) {
+                lastProgressBroadcast.set(now);
+                notificationService.scanProgress(s, t, file.getFileName().toString());
+            }
         } catch (Exception e) {
             LOG.warnf("Failed to index image %s: %s", file, e.getMessage());
         }

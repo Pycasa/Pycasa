@@ -20,9 +20,40 @@ export const NotificationsProvider = ({ children }) => {
     const [liveProgress, setLiveProgress] = useState({});     // type -> latest progress event (not in DB)
     const [unreadCount, setUnreadCount] = useState(0);
     const [connected, setConnected] = useState(false);
+    const [scanStatus, setScanStatus] = useState({ is_scanning: false, files_found: 0 });
+    const [aiStatus, setAiStatus] = useState({ is_running: false, processed_files: 0, total_files: 0, current_file: "" });
     const wsRef = useRef(null);
     const reconnectTimer = useRef(null);
     const mountedRef = useRef(true);
+
+    // Fetch initial statuses when socket connects
+    useEffect(() => {
+        if (connected) {
+            const fetchInitialStatuses = async () => {
+                try {
+                    const scan = await api.images.getScanStatus();
+                    setScanStatus({
+                        is_scanning: scan.is_scanning || scan.running,
+                        files_found: scan.files_found || scan.scanned
+                    });
+                } catch (e) {
+                    console.error("Failed to fetch initial scan status:", e);
+                }
+                try {
+                    const ai = await api.ai.getAnalysisStatus();
+                    setAiStatus({
+                        is_running: ai.is_running || ai.running,
+                        processed_files: ai.processed_files || ai.analysed,
+                        total_files: ai.total_files || ai.total,
+                        current_file: ai.current_file || ""
+                    });
+                } catch (e) {
+                    console.error("Failed to fetch initial AI status:", e);
+                }
+            };
+            fetchInitialStatuses();
+        }
+    }, [connected]);
 
     // Load persisted notifications from DB
     const loadFromDb = useCallback(async (search = null, eventType = null) => {
@@ -42,6 +73,27 @@ export const NotificationsProvider = ({ children }) => {
 
     // Handle incoming WebSocket event
     const handleEvent = useCallback((event) => {
+        if (event.type === 'scan:started') {
+            setScanStatus({ is_scanning: true, files_found: 0 });
+        } else if (event.type === 'scan:progress') {
+            setScanStatus({ is_scanning: true, files_found: event.payload.scanned });
+        } else if (event.type === 'scan:completed') {
+            setScanStatus({ is_scanning: false, files_found: event.payload.total });
+        } else if (event.type === 'scan:error') {
+            setScanStatus({ is_scanning: false, files_found: 0 });
+        } else if (event.type === 'ai:started') {
+            setAiStatus({ is_running: true, processed_files: 0, total_files: event.payload.total || 0, current_file: "" });
+        } else if (event.type === 'ai:progress') {
+            setAiStatus({
+                is_running: true,
+                processed_files: event.payload.analysed,
+                total_files: event.payload.total,
+                current_file: event.payload.current_file || ""
+            });
+        } else if (event.type === 'ai:completed' || event.type === 'ai:error') {
+            setAiStatus({ is_running: false, processed_files: 0, total_files: 0, current_file: "" });
+        }
+
         if (PROGRESS_TYPES.has(event.type)) {
             // Progress events: update live state only, not DB
             setLiveProgress(prev => ({ ...prev, [event.type]: event }));
@@ -151,6 +203,8 @@ export const NotificationsProvider = ({ children }) => {
             liveProgress,
             unreadCount,
             connected,
+            scanStatus,
+            aiStatus,
             markRead,
             markAllRead,
             deleteOne,

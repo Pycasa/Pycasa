@@ -30,11 +30,12 @@ public class AiService {
     private final AtomicInteger analysed = new AtomicInteger(0);
     private final AtomicInteger total = new AtomicInteger(0);
     private volatile String currentStatus = "idle";
+    private volatile String currentFile = "";
 
-    public record AnalysisStatus(boolean running, int analysed, int total, String status) {}
+    public record AnalysisStatus(boolean running, int analysed, int total, String status, String currentFile) {}
 
     public AnalysisStatus getAnalysisStatus() {
-        return new AnalysisStatus(analysing.get(), analysed.get(), total.get(), currentStatus);
+        return new AnalysisStatus(analysing.get(), analysed.get(), total.get(), currentStatus, currentFile);
     }
 
     public void triggerBatchAnalysis(boolean rerun) {
@@ -63,6 +64,7 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
                 try {
                     // Notify progress before analysing
                     String filename = new File(img.file_path).getName();
+                    currentFile = filename;
                     notificationService.broadcast("ai:progress", Map.of(
                             "analysed", analysed.get(),
                             "total", total.get(),
@@ -104,6 +106,7 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
             ));
         } finally {
             analysing.set(false);
+            currentFile = "";
         }
     }
 

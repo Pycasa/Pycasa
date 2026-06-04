@@ -42,6 +42,7 @@ public class DatabaseRepository {
             SelectResult.property("created_at"),
             SelectResult.property("indexed_at"),
             SelectResult.property("ai_analysed"),
+            SelectResult.property("thumbnail_path"),
             SelectResult.property("type"),
     };
 
@@ -73,10 +74,35 @@ public class DatabaseRepository {
             database = new Database(dbName, config);
             defaultCollection = database.getDefaultCollection();
             LOG.infof("Couchbase Lite database opened at %s/%s", dir, dbName);
+            ensureIndexes();
             ensureDefaultUser();
             ensureDefaultSettings();
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialise Couchbase Lite database", e);
+        }
+    }
+
+    private void ensureIndexes() {
+        try {
+            // Index 1: type + modified_at (DESC) — used by timeline date-count query and main listImages sort
+            ValueIndexConfiguration idxTypeModified = new ValueIndexConfiguration(new String[]{"type", "modified_at"});
+            defaultCollection.createIndex("idx_type_modified_at", idxTypeModified);
+
+            // Index 2: type + folder_id + modified_at — used by folder-filtered listImages
+            ValueIndexConfiguration idxTypeFolderModified = new ValueIndexConfiguration(new String[]{"type", "folder_id", "modified_at"});
+            defaultCollection.createIndex("idx_type_folder_modified_at", idxTypeFolderModified);
+
+            // Index 3: type + file_path — used by findImageByPath
+            ValueIndexConfiguration idxTypeFilePath = new ValueIndexConfiguration(new String[]{"type", "file_path"});
+            defaultCollection.createIndex("idx_type_file_path", idxTypeFilePath);
+
+            // Index 4: type + created_at — used when listImages sorts by created_at
+            ValueIndexConfiguration idxTypeCreated = new ValueIndexConfiguration(new String[]{"type", "created_at"});
+            defaultCollection.createIndex("idx_type_created_at", idxTypeCreated);
+
+            LOG.info("Couchbase Lite indexes ensured (type+modified_at, type+folder_id+modified_at, type+file_path, type+created_at)");
+        } catch (Exception e) {
+            LOG.warnf("Could not create indexes: %s", e.getMessage());
         }
     }
 
@@ -359,6 +385,29 @@ public class DatabaseRepository {
         }
     }
 
+    public Map<String, Long> getImageDateCounts() {
+        Map<String, Long> counts = new TreeMap<>(Collections.reverseOrder());
+        try {
+            Query q = QueryBuilder.select(SelectResult.property("modified_at"))
+                    .from(DataSource.collection(defaultCollection))
+                    .where(Expression.property("type").equalTo(Expression.string("image")));
+            ResultSet rs = q.execute();
+            for (Result r : rs.allResults()) {
+                long modifiedAt = r.getLong("modified_at");
+                if (modifiedAt > 0) {
+                    java.time.LocalDate date = java.time.Instant.ofEpochMilli(modifiedAt)
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toLocalDate();
+                    String dateStr = date.toString();
+                    counts.put(dateStr, counts.getOrDefault(dateStr, 0L) + 1);
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("getImageDateCounts failed: " + e.getMessage());
+        }
+        return counts;
+    }
+
     public void deleteImagesByFolderId(String folderId) {
         try {
             Query q = QueryBuilder.select(SelectResult.expression(Meta.id))
@@ -377,6 +426,35 @@ public class DatabaseRepository {
             }
         } catch (Exception e) {
             LOG.warnf("deleteImagesByFolderId failed for folder %s: %s", folderId, e.getMessage());
+        }
+    }
+
+    public long countImagesByFolderId(String folderId) {
+        try {
+            Query q = QueryBuilder.select(SelectResult.expression(Function.count(Expression.string("*"))))
+                    .from(DataSource.collection(defaultCollection))
+                    .where(Expression.property("type").equalTo(Expression.string("image"))
+                            .and(Expression.property("folder_id").equalTo(Expression.string(folderId))));
+            ResultSet rs = q.execute();
+            List<Result> results = rs.allResults();
+            return results.isEmpty() ? 0 : results.get(0).getLong(0);
+        } catch (Exception e) {
+            LOG.warnf("countImagesByFolderId failed: %s", e.getMessage());
+            return 0;
+        }
+    }
+
+    public long countAllImages() {
+        try {
+            Query q = QueryBuilder.select(SelectResult.expression(Function.count(Expression.string("*"))))
+                    .from(DataSource.collection(defaultCollection))
+                    .where(Expression.property("type").equalTo(Expression.string("image")));
+            ResultSet rs = q.execute();
+            List<Result> results = rs.allResults();
+            return results.isEmpty() ? 0 : results.get(0).getLong(0);
+        } catch (Exception e) {
+            LOG.warnf("countAllImages failed: %s", e.getMessage());
+            return 0;
         }
     }
 
@@ -507,6 +585,7 @@ public class DatabaseRepository {
         img.created_at = r.getLong("created_at");
         img.indexed_at = r.getLong("indexed_at");
         img.ai_analysed = r.getBoolean("ai_analysed");
+        img.thumbnail_path = r.getString("thumbnail_path");
         Array arr = r.getArray("tags");
         if (arr != null) {
             List<String> tagList = new ArrayList<>();
