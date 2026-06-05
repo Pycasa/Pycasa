@@ -39,7 +39,7 @@ export default function Navbar({ page, navScrolled, onHome, onHowTos }) {
             How-To
           </button>
           <a href="https://github.com/pycasa/pycasa" target="_blank" rel="noopener noreferrer" className="nav-gh">
-            <GithubIcon /> GitHub
+            <GithubIcon /> 
           </a>
           {page === 'home'
             ? <a href="#install" className="nav-cta">Download</a>
@@ -74,7 +74,6 @@ export default function Navbar({ page, navScrolled, onHome, onHowTos }) {
           </button>
           <a href="https://github.com/pycasa/pycasa" target="_blank" rel="noopener noreferrer"
             className="nav-mobile-item" onClick={() => setMenuOpen(false)}>
-            GitHub
           </a>
           {page === 'home'
             ? <a href="#install" className="nav-mobile-item nav-mobile-cta" onClick={() => setMenuOpen(false)}>Download</a>

@@ -176,6 +176,95 @@ const sections = [
     tip: 'Combine a tag filter with a date range to quickly find, for example, all "sunset" photos from last summer.',
   },
   {
+    id: 'ai-single',
+    icon: '🔬',
+    color: 'orange',
+    title: 'How to run AI analysis on a single image',
+    shortTitle: 'AI image analysis',
+    steps: [
+      {
+        heading: 'Prerequisites',
+        items: [
+          'Make sure you have configured an AI provider first. Open Settings → "AI Settings" and set up Ollama, Google Gemini, or OpenAI.',
+          'Confirm at least one folder has been added and scanned so images appear in the Timeline or Gallery.',
+        ],
+      },
+      {
+        heading: 'Triggering analysis from the image preview panel',
+        items: [
+          'Open the Timeline or Gallery view.',
+          'Click any image thumbnail to open the image preview panel on the right side.',
+          'Locate the "AI Analyse" button in the preview panel toolbar.',
+          'Click "AI Analyse". Pycasa sends the image to your configured AI provider.',
+          'Wait a few seconds — the AI description and tags will appear in the preview panel once processing is complete.',
+          'The notification bell in the top bar will also show a completion update.',
+        ],
+      },
+      {
+        heading: 'Triggering analysis from fullscreen mode',
+        items: [
+          'Click the ⛶ expand icon on any image to enter fullscreen mode.',
+          'The "AI Analyse" button is also available in the fullscreen toolbar.',
+          'Click it and the analysis runs in the background — the description and tags update automatically when ready.',
+        ],
+      },
+      {
+        heading: 'Viewing the results',
+        items: [
+          'After analysis, the image preview panel shows the AI-generated description and a list of tag badges.',
+          'Tags are also searchable — use the search bar or tag filter in Gallery/Timeline to find images by these tags.',
+          'Re-running "AI Analyse" on the same image overwrites the previous description and tags.',
+        ],
+      },
+    ],
+    tip: 'Single-image analysis is great for quickly testing your AI configuration or refreshing the description of a specific photo without waiting for a full batch run.',
+  },
+  {
+    id: 'ai-batch',
+    icon: '⚡',
+    color: 'pink',
+    title: 'How to run AI analysis in batch for all images',
+    shortTitle: 'AI batch analysis',
+    steps: [
+      {
+        heading: 'Prerequisites',
+        items: [
+          'Configure an AI provider under Settings → "AI Settings" before starting. See the "AI settings" guide for setup steps.',
+          'Ensure your images have been indexed — run a folder scan first if you have just added folders.',
+          'For Ollama, make sure the Ollama service is running on your machine before starting the batch job.',
+        ],
+      },
+      {
+        heading: 'Starting the batch job',
+        items: [
+          'Click the ⚙️ Settings icon in the top navigation bar.',
+          'Navigate to the "AI Settings" tab.',
+          'Click the "Analyse All Images" button.',
+          'Pycasa kicks off a background job that processes every image in the database one by one.',
+          'The button becomes disabled while the job is running to prevent duplicate submissions.',
+        ],
+      },
+      {
+        heading: 'Monitoring progress',
+        items: [
+          'Click the 🔔 notification bell in the top navigation bar to see real-time progress.',
+          'Each notification shows which image is currently being processed and an overall count.',
+          'A final "Analysis complete" notification appears when all images have been processed.',
+        ],
+      },
+      {
+        heading: 'After the batch job completes',
+        items: [
+          'All images now have AI-generated descriptions and tags stored in the database.',
+          'Use the search bar in Timeline or Gallery to search by any word in those descriptions.',
+          'Use the tag filter to browse images by AI-generated tags (e.g. "sunset", "dog", "beach").',
+          'Re-running "Analyse All Images" will overwrite existing descriptions and tags for every image.',
+        ],
+      },
+    ],
+    tip: 'Batch analysis can take a while depending on your library size and AI provider speed. Ollama on a modern GPU can process hundreds of images per hour. Leave Pycasa running in the background — it will work through the queue automatically.',
+  },
+  {
     id: 'rescan',
     icon: '🔄',
     color: 'yellow',
@@ -219,6 +308,8 @@ const colorMap = {
   blue:   { bg: 'rgba(59,130,246,0.12)',  accent: '#3B82F6', border: 'rgba(59,130,246,0.25)' },
   teal:   { bg: 'rgba(6,182,212,0.12)',   accent: '#06B6D4', border: 'rgba(6,182,212,0.25)' },
   yellow: { bg: 'rgba(245,158,11,0.12)',  accent: '#F59E0B', border: 'rgba(245,158,11,0.25)' },
+  orange: { bg: 'rgba(249,115,22,0.12)',  accent: '#F97316', border: 'rgba(249,115,22,0.25)' },
+  pink:   { bg: 'rgba(236,72,153,0.12)',  accent: '#EC4899', border: 'rgba(236,72,153,0.25)' },
 };
 
 /* ─────────────────────────────────────────────
