@@ -127,7 +127,7 @@ Pycasa uses [Tesseract](https://github.com/tesseract-ocr/tesseract) for text ext
 
 ## API
 
-Swagger UI is available at **http://localhost:/docs** when the server is running.
+Swagger UI is available at **http://localhost:3000/docs** when the server is running.
 
 ## Tech Stack
 

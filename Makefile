@@ -1,6 +1,6 @@
 # Makefile for Pycasa
 
-.PHONY: help dev build check killall
+.PHONY: help dev build killall pre-dev
 
 ROOT_DIR := $(shell pwd)
 MVN      := mvn
@@ -11,6 +11,28 @@ help: ## Show available commands
 	@echo "Available targets:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
+
+pre-dev: # check and setup dev env
+	@command -v $(MVN) >/dev/null 2>&1 || \
+		{ echo "Error: Maven (mvn) is not installed."; exit 1; }
+	@command -v node >/dev/null 2>&1 || \
+		{ echo "Error: Node.js is not installed."; exit 1; }
+	@command -v npm >/dev/null 2>&1 || \
+		{ echo "Error: npm is not installed."; exit 1; }
+	@echo "Setting up dev environment..."
+	@command -v pre-commit >/dev/null 2>&1 || { echo "Error: pre-commit is not installed. Please install it first. using 'pip install pre-commit' or 'brew install pre-commit'"; exit 1; }
+	@command -v docker >/dev/null 2>&1 || { echo "Error: docker is not installed. Please install it first."; exit 1; }
+	@pre-commit install
+	@pre-commit autoupdate
+	@pre-commit install --install-hooks
+
+check-formatting:
+	@echo "\033[0;34mChecking code formatting...\033[0m"
+	@mvn spotless:check
+
+apply-formatting:
+	@echo "\033[0;32mApplying code formatting...\033[0m"
+	@mvn spotless:apply
 
 killall:
 	@lsof -ti :3000 | xargs kill -9
@@ -25,7 +47,7 @@ killall:
 #   UI changes  → instant HMR (Vite running behind the scenes)
 #   Java changes → Quarkus hot reloads on next request
 #
-dev: check killall ## Hot-reload dev mode
+dev: pre-dev killall ## Hot-reload dev mode
 	@echo ""
 	@echo "Starting Pycasa in dev mode..."
 	@echo ""
@@ -38,7 +60,7 @@ dev: check killall ## Hot-reload dev mode
 # Produces a single self-contained uber-jar with the UI bundled inside.
 # Quinoa runs npm install + npm run build automatically during mvn package.
 #
-build: check ## Build production uber-jar with UI embedded
+build: pre-dev ## Build production uber-jar with UI embedded
 	@echo "Building production package..."
 	@cd $(ROOT_DIR) && $(MVN) clean package
 	@JAR_FILE=$$(cd $(ROOT_DIR) && $(MVN) help:evaluate -Dexpression=project.build.finalName -q -DforceStdout); \
@@ -46,18 +68,6 @@ build: check ## Build production uber-jar with UI embedded
 	echo "Run with:"; \
 	echo "  java -jar target/$$JAR_FILE-runner.jar"; \
 	echo ""
-
-# ==============================
-# Environment check
-# ==============================
-
-check: ## Verify required tools are installed
-	@command -v $(MVN) >/dev/null 2>&1 || \
-		{ echo "Error: Maven (mvn) is not installed."; exit 1; }
-	@command -v node >/dev/null 2>&1 || \
-		{ echo "Error: Node.js is not installed."; exit 1; }
-	@command -v npm >/dev/null 2>&1 || \
-		{ echo "Error: npm is not installed."; exit 1; }
 
 build-docs:
 	@echo "Building docs artifacts..."

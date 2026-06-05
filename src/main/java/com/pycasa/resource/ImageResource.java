@@ -10,6 +10,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import javax.imageio.ImageIO;
 import java.nio.file.Files;
 import java.util.*;
 
@@ -253,7 +260,7 @@ public class ImageResource {
             if (imgRecord != null && imgRecord.thumbnail_path != null) {
                 thumbFile = new File(imgRecord.thumbnail_path);
             }
-            
+
             if (thumbFile == null || !thumbFile.exists()) {
                 // Determine thumbnail cache directory inside the DB directory
                 String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
@@ -261,26 +268,79 @@ public class ImageResource {
                 thumbDir.mkdirs();
                 String thumbName = (imgRecord != null ? imgRecord.id : src.getName()) + "_thumb.jpg";
                 thumbFile = new File(thumbDir, thumbName);
-                
+
                 if (!thumbFile.exists()) {
-                    // Generate a 300px thumbnail using Thumbnailator
-                    net.coobird.thumbnailator.Thumbnails.of(src)
-                            .size(300, 300)
-                            .keepAspectRatio(true)
-                            .outputFormat("jpg")
-                            .toFile(thumbFile);
+                    try {
+                        // Generate a 300px thumbnail using Thumbnailator
+                        net.coobird.thumbnailator.Thumbnails.of(src)
+                                .size(300, 300)
+                                .keepAspectRatio(true)
+                                .outputFormat("jpg")
+                                .toFile(thumbFile);
+                    } catch (Exception decodeEx) {
+                        // Format not supported by ImageIO (e.g. HEIC) — generate a placeholder
+                        LOG.debugf("Cannot decode %s for thumbnail (%s), generating placeholder", path, decodeEx.getMessage());
+                        String ext = src.getName().contains(".")
+                                ? src.getName().substring(src.getName().lastIndexOf('.') + 1).toUpperCase()
+                                : "IMG";
+                        generatePlaceholderThumbnail(thumbFile, ext);
+                    }
                 }
-                
+
                 // Save path to Couchbase Lite document
-                if (imgRecord != null) {
+                if (imgRecord != null && thumbFile.exists()) {
                     imgRecord.thumbnail_path = thumbFile.getAbsolutePath();
                     db.save(imgRecord.id, imgRecord);
                 }
+            }
+
+            if (!thumbFile.exists()) {
+                return Response.serverError().build();
             }
             return Response.ok(thumbFile, "image/jpeg").build();
         } catch (Exception e) {
             LOG.warnf("Failed to generate thumbnail for %s: %s", path, e.getMessage());
             return Response.serverError().build();
         }
+    }
+
+    /**
+     * Generates a 300x300 grey placeholder JPEG with the file extension label centred on it.
+     * Used for formats that Java ImageIO cannot decode (e.g. HEIC, AVIF).
+     */
+    private void generatePlaceholderThumbnail(File dest, String label) throws Exception {
+        int size = 300;
+        BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+        // Background
+        g.setColor(new Color(30, 35, 46));
+        g.fillRect(0, 0, size, size);
+
+        // Subtle grid pattern
+        g.setColor(new Color(255, 255, 255, 12));
+        for (int x = 0; x < size; x += 20) g.drawLine(x, 0, x, size);
+        for (int y = 0; y < size; y += 20) g.drawLine(0, y, size, y);
+
+        // File-type badge background
+        int badgeW = 120, badgeH = 44;
+        int bx = (size - badgeW) / 2, by = (size - badgeH) / 2;
+        g.setColor(new Color(60, 65, 80));
+        g.fillRoundRect(bx, by, badgeW, badgeH, 12, 12);
+        g.setColor(new Color(100, 110, 130));
+        g.drawRoundRect(bx, by, badgeW, badgeH, 12, 12);
+
+        // Extension text
+        g.setColor(new Color(180, 190, 210));
+        g.setFont(new Font("SansSerif", Font.BOLD, 18));
+        java.awt.FontMetrics fm = g.getFontMetrics();
+        int tx = (size - fm.stringWidth(label)) / 2;
+        int ty = by + (badgeH + fm.getAscent() - fm.getDescent()) / 2;
+        g.drawString(label, tx, ty);
+
+        g.dispose();
+        ImageIO.write(img, "jpg", dest);
     }
     }
