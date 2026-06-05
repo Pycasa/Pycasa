@@ -2,13 +2,15 @@
    <img width="150" height="150" alt="logo-no-bg" src="https://github.com/user-attachments/assets/c73be700-2369-4ead-9875-b27a5a68a5cb" />
 
 ### Pycasa
+
 **Your photos, your server, your rules.**
+
+Pycasa is a self-hosted photo management application that runs entirely on your own machine. No cloud subscriptions, no data leaving your network. Point it at your photo folders and get a fast, searchable gallery with AI-powered descriptions, tags, and OCR — all processed locally.
+
+<a href="https://pycasa.github.io/Pycasa/">Go to Website</a>
 
 </div>
 
-
-
-Pycasa is a self-hosted photo management application that runs entirely on your own machine. No cloud subscriptions, no data leaving your network. Point it at your photo folders and get a fast, searchable gallery with AI-powered descriptions, tags, and OCR — all processed locally.
 
 <div align="center">
    <img height="400" alt="timeline-light" src="https://github.com/user-attachments/assets/4bbd8b40-66de-4ac8-98d0-cbf7f8c33b55" />
