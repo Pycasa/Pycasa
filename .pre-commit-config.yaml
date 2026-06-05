@@ -21,26 +21,30 @@ repos:
 
   # for commit message formatting
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.13.10
+    rev: v4.16.3
     hooks:
       - id: commitizen
         stages: [commit-msg]
 
   - repo: local
     hooks:
-      - id: format-code
-        name: Format Code
-        entry: make apply-formatting
+      - id: format-java
+        name: Format Java (Spotless)
+        entry: mvn spotless:apply
         language: system
-        always_run: true
+        files: \.java$
+        pass_filenames: false
 
- # for java code quality
- - repo: https://github.com/gherynos/pre-commit-java
-   rev: v0.6.10
-   hooks:
-     - id: pm
-       exclude: /test/
-     - id: cpd
-       exclude: /test/
-     - id: checkstyle
-       exclude: /test/
+      - id: format-js
+        name: Format JS/JSX/CSS/HTML (Prettier - webapp)
+        entry: sh -c 'cd src/main/webapp && npm run format'
+        language: system
+        files: ^src/main/webapp/src/.*\.(js|jsx|css|html)$
+        pass_filenames: false
+
+      - id: format-docs
+        name: Format JS/JSX/CSS/HTML (Prettier - docs)
+        entry: sh -c 'cd docs && npm run format'
+        language: system
+        files: ^docs/src/.*\.(js|jsx|css|html)$
+        pass_filenames: false

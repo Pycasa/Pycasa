@@ -21,18 +21,25 @@ pre-dev: # check and setup dev env
 		{ echo "Error: npm is not installed."; exit 1; }
 	@echo "Setting up dev environment..."
 	@command -v pre-commit >/dev/null 2>&1 || { echo "Error: pre-commit is not installed. Please install it first. using 'pip install pre-commit' or 'brew install pre-commit'"; exit 1; }
-	@command -v docker >/dev/null 2>&1 || { echo "Error: docker is not installed. Please install it first."; exit 1; }
 	@pre-commit install
 	@pre-commit autoupdate
 	@pre-commit install --install-hooks
 
 check-formatting:
-	@echo "\033[0;34mChecking code formatting...\033[0m"
+	@echo "\033[0;34mChecking Java formatting...\033[0m"
 	@mvn spotless:check
+	@echo "\033[0;34mChecking JS/JSX/CSS/HTML formatting (webapp)...\033[0m"
+	@cd $(ROOT_DIR)/src/main/webapp && npm run format:check
+	@echo "\033[0;34mChecking JS/JSX/CSS/HTML formatting (docs)...\033[0m"
+	@cd $(ROOT_DIR)/docs && npm run format:check
 
 apply-formatting:
-	@echo "\033[0;32mApplying code formatting...\033[0m"
+	@echo "\033[0;32mFormatting Java files...\033[0m"
 	@mvn spotless:apply
+	@echo "\033[0;32mFormatting JS/JSX/CSS/HTML files (webapp)...\033[0m"
+	@cd $(ROOT_DIR)/src/main/webapp && npm run format
+	@echo "\033[0;32mFormatting JS/JSX/CSS/HTML files (docs)...\033[0m"
+	@cd $(ROOT_DIR)/docs && npm run format
 
 killall:
 	@lsof -ti :3000 | xargs kill -9
