@@ -621,7 +621,7 @@ const TimelineView = () => {
 
     const modalImage = useMemo(() => {
         if (!selectedImage) return null;
-        return { ...selectedImage, full_path: selectedImage.file_path, modified: selectedImage.modified_at };
+        return { ...selectedImage, full_path: selectedImage.file_path, modified: selectedImage.modified_at, size: selectedImage.file_size };
     }, [selectedImage]);
 
     // ── Render ───────────────────────────────────────────────────────────────

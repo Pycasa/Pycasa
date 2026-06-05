@@ -303,12 +303,12 @@ const ImageDetailModal = ({ image, isOpen, onClose, onUpdate, onNext, onPrevious
                         <div className="flex-grow flex flex-col md:flex-row h-full overflow-hidden">
 
                     {/* Image Preview - Top (mobile) or Left/Center (desktop) */}
-                    <div className="flex-grow bg-slate-950 flex items-center justify-center p-4 overflow-hidden relative group">
+                    <div className="flex-grow bg-slate-950 flex items-center justify-center p-0 overflow-hidden relative group">
                         <div className="absolute top-2 right-2 z-10 flex gap-2">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-white/50 hover:text-white hover:bg-black/40 rounded-full"
+                                className="text-white/50 hover:text-white bg-black/20 hover:bg-black/40 rounded-full"
                                 onClick={toggleDetails}
                                 title={showDetails ? "Hide details" : "Show details"}
                             >
@@ -317,7 +317,7 @@ const ImageDetailModal = ({ image, isOpen, onClose, onUpdate, onNext, onPrevious
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-white/50 hover:text-white hover:bg-black/40 rounded-full"
+                                className="text-white/50 hover:text-white bg-black/20 hover:bg-black/40 rounded-full"
                                 onClick={onClose}
                             >
                                 <X className="w-5 h-5" />
