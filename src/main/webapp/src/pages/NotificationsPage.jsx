@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
     Bell, CheckCheck, Trash2, Wifi, WifiOff, Search, X,
-    ScanLine, CheckCircle2, AlertCircle, Loader2, Sparkles, Filter
+    ScanLine, CheckCircle2, AlertCircle, Loader2, Sparkles, Filter, FolderMinus, FolderSearch, Ban
 } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationsContext';
 import { Button } from '@/components/ui/button';
@@ -11,24 +11,38 @@ import { Badge } from '@/components/ui/badge';
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 const EVENT_META = {
-    'scan:started':   { icon: ScanLine,     color: 'text-blue-500',   bg: 'bg-blue-50 dark:bg-blue-950/40',     border: 'border-blue-100 dark:border-blue-900/60',     label: 'Scan started',          category: 'scan' },
-    'scan:progress':  { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-100 dark:border-indigo-900/60', label: 'Scanning',              category: 'scan' },
-    'scan:completed': { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-950/40',   border: 'border-green-100 dark:border-green-900/60',   label: 'Scan complete',         category: 'scan' },
-    'scan:error':     { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-950/40',       border: 'border-red-100 dark:border-red-900/60',       label: 'Scan error',            category: 'scan' },
-    'ai:started':     { icon: Sparkles,     color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-100 dark:border-purple-900/60', label: 'AI analysis started',   category: 'ai'   },
-    'ai:progress':    { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-100 dark:border-indigo-900/60', label: 'Analysing',             category: 'ai'   },
-    'ai:completed':   { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-950/40',   border: 'border-green-100 dark:border-green-900/60',   label: 'AI analysis complete',  category: 'ai'   },
-    'ai:error':       { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-950/40',       border: 'border-red-100 dark:border-red-900/60',       label: 'AI error',              category: 'ai'   },
+    'scan:started':              { icon: ScanLine,     color: 'text-blue-500',   bg: 'bg-blue-50 dark:bg-blue-950/40',       border: 'border-blue-100 dark:border-blue-900/60',       label: 'Scan started',          category: 'scan'   },
+    'scan:progress':             { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/40',   border: 'border-indigo-100 dark:border-indigo-900/60',   label: 'Scanning',              category: 'scan'   },
+    'scan:completed':            { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-950/40',     border: 'border-green-100 dark:border-green-900/60',     label: 'Scan complete',         category: 'scan'   },
+    'scan:error':                { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-950/40',         border: 'border-red-100 dark:border-red-900/60',         label: 'Scan error',            category: 'scan'   },
+    'scan:cancelling':           { icon: Ban,          color: 'text-amber-500',  bg: 'bg-amber-50 dark:bg-amber-950/40',     border: 'border-amber-100 dark:border-amber-900/60',     label: 'Cancelling scan',       category: 'scan'   },
+    'scan:folder:started':       { icon: FolderSearch, color: 'text-blue-500',   bg: 'bg-blue-50 dark:bg-blue-950/40',       border: 'border-blue-100 dark:border-blue-900/60',       label: 'Folder scan started',   category: 'scan'   },
+    'scan:folder:progress':      { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/40',   border: 'border-indigo-100 dark:border-indigo-900/60',   label: 'Scanning folder',       category: 'scan'   },
+    'scan:folder:completed':     { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-950/40',     border: 'border-green-100 dark:border-green-900/60',     label: 'Folder scan complete',  category: 'scan'   },
+    'scan:folder:cancelled':     { icon: Ban,          color: 'text-amber-500',  bg: 'bg-amber-50 dark:bg-amber-950/40',     border: 'border-amber-100 dark:border-amber-900/60',     label: 'Folder scan cancelled', category: 'scan'   },
+    'scan:folder:error':         { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-950/40',         border: 'border-red-100 dark:border-red-900/60',         label: 'Folder scan error',     category: 'scan'   },
+    'ai:started':                { icon: Sparkles,     color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/40',   border: 'border-purple-100 dark:border-purple-900/60',   label: 'AI analysis started',   category: 'ai'     },
+    'ai:progress':               { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/40',   border: 'border-indigo-100 dark:border-indigo-900/60',   label: 'Analysing',             category: 'ai'     },
+    'ai:completed':              { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-950/40',     border: 'border-green-100 dark:border-green-900/60',     label: 'AI analysis complete',  category: 'ai'     },
+    'ai:error':                  { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-950/40',         border: 'border-red-100 dark:border-red-900/60',         label: 'AI error',              category: 'ai'     },
+    'folder-delete:started':     { icon: FolderMinus,  color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-950/40',   border: 'border-orange-100 dark:border-orange-900/60',   label: 'Removing location',     category: 'folder' },
+    'folder-delete:progress':    { icon: Loader2,      color: 'text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/40',   border: 'border-orange-100 dark:border-orange-900/60',   label: 'Removing…',             category: 'folder' },
+    'folder-delete:completed':   { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-950/40',     border: 'border-green-100 dark:border-green-900/60',     label: 'Location removed',      category: 'folder' },
+    'folder-delete:error':       { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-950/40',         border: 'border-red-100 dark:border-red-900/60',         label: 'Remove failed',         category: 'folder' },
 };
 
 const FILTER_OPTIONS = [
-    { value: '',             label: 'All' },
-    { value: 'scan:started',   label: 'Scan started' },
-    { value: 'scan:completed', label: 'Scan complete' },
-    { value: 'scan:error',     label: 'Scan error' },
-    { value: 'ai:started',     label: 'AI started' },
-    { value: 'ai:completed',   label: 'AI complete' },
-    { value: 'ai:error',       label: 'AI error' },
+    { value: '',                         label: 'All' },
+    { value: 'scan:folder:started',      label: 'Folder scan started' },
+    { value: 'scan:folder:completed',    label: 'Folder scan complete' },
+    { value: 'scan:folder:cancelled',    label: 'Folder scan cancelled' },
+    { value: 'scan:folder:error',        label: 'Folder scan error' },
+    { value: 'ai:started',               label: 'AI started' },
+    { value: 'ai:completed',             label: 'AI complete' },
+    { value: 'ai:error',                 label: 'AI error' },
+    { value: 'folder-delete:started',    label: 'Location removing' },
+    { value: 'folder-delete:completed',  label: 'Location removed' },
+    { value: 'folder-delete:error',      label: 'Remove failed' },
 ];
 
 const formatDateTime = (ts) => {
@@ -141,7 +155,11 @@ const NotificationsPage = () => {
                             const p = event.payload || {};
                             const msg = event.type === 'scan:progress'
                                 ? `${p.scanned} found${p.current_file ? ` — ${p.current_file}` : ''}`
-                                : `${p.analysed}/${p.total}${p.current_file ? ` — ${p.current_file}` : ''}`;
+                                : event.type === 'scan:folder:progress'
+                                    ? `${p.scanned}/${p.total}${p.current_file ? ` — ${p.current_file}` : ''}`
+                                    : event.type === 'folder-delete:progress'
+                                        ? `${p.deleted}/${p.total} records removed`
+                                        : `${p.analysed}/${p.total}${p.current_file ? ` — ${p.current_file}` : ''}`;
                             return (
                                 <div key={event.type} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${meta.border} ${meta.bg} animate-pulse`}>
                                     <Icon className={`w-4 h-4 ${meta.color} animate-spin shrink-0`} />

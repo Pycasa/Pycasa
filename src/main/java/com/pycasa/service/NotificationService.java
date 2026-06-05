@@ -42,7 +42,7 @@ public class NotificationService {
         long ts = System.currentTimeMillis();
 
         // Persist non-progress events to DB
-        boolean isProgress = type.endsWith(":progress");
+        boolean isProgress = type.endsWith(":progress") || type.equals("scan:cancelling");
         if (!isProgress) {
             try {
                 String message = buildMessage(type, payload);
@@ -81,13 +81,20 @@ public class NotificationService {
 
     private String buildMessage(String type, Map<String, Object> payload) {
         return switch (type) {
-            case "scan:started"   -> "Folder scan started";
-            case "scan:completed" -> "Scan complete — " + payload.getOrDefault("total", 0) + " images indexed";
-            case "scan:error"     -> "Scan error: " + payload.getOrDefault("message", "unknown");
-            case "ai:started"     -> "AI analysis started — " + payload.getOrDefault("total", 0) + " images";
-            case "ai:completed"   -> "AI analysis complete — " + payload.getOrDefault("analysed", 0) + " images analysed";
-            case "ai:error"       -> "AI error: " + payload.getOrDefault("message", "unknown");
-            default               -> String.valueOf(payload.getOrDefault("message", type));
+            case "scan:started"             -> "Folder scan started";
+            case "scan:completed"           -> "Scan complete — " + payload.getOrDefault("total", 0) + " images indexed";
+            case "scan:error"               -> "Scan error: " + payload.getOrDefault("message", "unknown");
+            case "scan:folder:started"      -> String.valueOf(payload.getOrDefault("message", "Scan started"));
+            case "scan:folder:completed"    -> String.valueOf(payload.getOrDefault("message", "Scan complete"));
+            case "scan:folder:cancelled"    -> String.valueOf(payload.getOrDefault("message", "Scan cancelled"));
+            case "scan:folder:error"        -> String.valueOf(payload.getOrDefault("message", "Scan error"));
+            case "ai:started"               -> "AI analysis started — " + payload.getOrDefault("total", 0) + " images";
+            case "ai:completed"             -> "AI analysis complete — " + payload.getOrDefault("analysed", 0) + " images analysed";
+            case "ai:error"                 -> "AI error: " + payload.getOrDefault("message", "unknown");
+            case "folder-delete:started"    -> String.valueOf(payload.getOrDefault("message", "Removing location…"));
+            case "folder-delete:completed"  -> String.valueOf(payload.getOrDefault("message", "Location removed"));
+            case "folder-delete:error"      -> "Remove failed: " + payload.getOrDefault("message", "unknown");
+            default                         -> String.valueOf(payload.getOrDefault("message", type));
         };
     }
 

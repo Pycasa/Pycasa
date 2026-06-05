@@ -13,7 +13,13 @@ const WS_URL = `ws://${window.location.host}/ws/notifications`;
 const RECONNECT_DELAY_MS = 3000;
 
 // Progress event types — broadcast live but not persisted to DB
-const PROGRESS_TYPES = new Set(['scan:progress', 'ai:progress']);
+const PROGRESS_TYPES = new Set([
+    'scan:progress',
+    'scan:folder:progress',
+    'scan:cancelling',
+    'ai:progress',
+    'folder-delete:progress',
+]);
 
 export const NotificationsProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([]);   // DB-persisted
@@ -95,8 +101,11 @@ export const NotificationsProvider = ({ children }) => {
         }
 
         if (PROGRESS_TYPES.has(event.type)) {
-            // Progress events: update live state only, not DB
-            setLiveProgress(prev => ({ ...prev, [event.type]: event }));
+            // Per-folder progress: key by folder_id so multiple folders can show concurrently
+            const key = event.payload?.folder_id
+                ? `${event.type}:${event.payload.folder_id}`
+                : event.type;
+            setLiveProgress(prev => ({ ...prev, [key]: event }));
         } else {
             // Terminal events clear their corresponding progress entry
             if (event.type === 'scan:completed' || event.type === 'scan:error') {
@@ -104,6 +113,21 @@ export const NotificationsProvider = ({ children }) => {
             }
             if (event.type === 'ai:completed' || event.type === 'ai:error') {
                 setLiveProgress(prev => { const n = { ...prev }; delete n['ai:progress']; return n; });
+            }
+            if (event.type === 'folder-delete:completed' || event.type === 'folder-delete:error') {
+                setLiveProgress(prev => { const n = { ...prev }; delete n['folder-delete:progress']; return n; });
+            }
+            // Clear per-folder scan progress when that folder's scan finishes/cancels/errors
+            if (['scan:folder:completed', 'scan:folder:cancelled', 'scan:folder:error'].includes(event.type)) {
+                const fid = event.payload?.folder_id;
+                if (fid) {
+                    setLiveProgress(prev => {
+                        const n = { ...prev };
+                        delete n[`scan:folder:progress:${fid}`];
+                        delete n[`scan:cancelling:${fid}`];
+                        return n;
+                    });
+                }
             }
 
             // Persisted events: prepend to list and bump unread count

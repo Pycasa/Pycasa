@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import logo from './assets/logo.png';
+import Navbar from './Navbar.jsx';
+import HowTosPage from './HowTos.jsx';
 
 const screenshots = [
   {
@@ -200,17 +202,27 @@ const aiProviders = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('jar');
+  const [page, setPage] = useState('home');
+  const [activeTab, setActiveTab] = useState('windows');
   const [activeScreenshot, setActiveScreenshot] = useState('timeline');
   const [copied, setCopied] = useState(false);
   const [ssPaused, setSsPaused] = useState(false);
   const [activeProvider, setActiveProvider] = useState(0);
   const [navScrolled, setNavScrolled] = useState(false);
+  const [latestVersion, setLatestVersion] = useState('v0.0.2'); // fallback
 
   useEffect(() => {
     const onScroll = () => setNavScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Fetch latest GitHub release version
+  useEffect(() => {
+    fetch('https://api.github.com/repos/Pycasa/Pycasa/releases/latest')
+      .then((r) => r.json())
+      .then((data) => { if (data.tag_name) setLatestVersion(data.tag_name); })
+      .catch(() => {}); // keep fallback on error
   }, []);
 
   // Auto-play screenshots
@@ -225,6 +237,9 @@ export default function App() {
     return () => clearInterval(interval);
   }, [ssPaused]);
 
+  const goToHowTos = () => { setPage('howtos'); window.scrollTo(0, 0); };
+  const goHome = () => { setPage('home'); window.scrollTo(0, 0); };
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(installCommands[activeTab].cmd);
     setCopied(true);
@@ -233,38 +248,36 @@ export default function App() {
 
   const currentScreenshot = screenshots.find((s) => s.id === activeScreenshot) || screenshots[0];
 
+  const sharedNav = (
+    <Navbar
+      page={page}
+      navScrolled={navScrolled}
+      onHome={goHome}
+      onHowTos={goToHowTos}
+    />
+  );
+
+  /* ── HOW-TO PAGE ── full separate layout ── */
+  if (page === 'howtos') {
+    return (
+      <div className="root-wrap">
+        <div className="glow glow-1" />
+        <div className="glow glow-2" />
+        <HowTosPage navbar={sharedNav} />
+      </div>
+    );
+  }
+
   return (
     <div className="root-wrap">
       {/* Background glows */}
       <div className="glow glow-1" />
       <div className="glow glow-2" />
 
-      {/* ── NAVIGATION ── */}
-      <nav className={navScrolled ? 'scrolled' : ''}>
-        <div className="nav-inner">
-          <a href="#" className="nav-logo">
-            <img src={logo} alt="Pycasa" />
-            <span className="nav-logo-name">Pycasa</span>
-          </a>
-          <div className="nav-links">
-            <a href="#features">Features</a>
-            {/* <a href="#demo">Screenshots</a> */}
-            <a href="#ai">AI Setup</a>
-            <a href="#install">Install</a>
-            <a
-              href="https://github.com/pycasa/pycasa"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="nav-gh"
-            >
-              <GithubIcon />
-              GitHub
-            </a>
-            <a href="#install" className="nav-cta">Get Started</a>
-          </div>
-        </div>
-      </nav>
+      {sharedNav}
 
+      {/* ── HOME PAGE CONTENT ── */}
+      <div>
       {/* ── HERO ── */}
       <section className="hero">
         <div className="hero-badge">
@@ -282,7 +295,7 @@ export default function App() {
         </p>
         <div className="hero-ctas">
           <a href="#install" className="btn-primary">
-            <DownloadIcon /> Get Started Free
+            <DownloadIcon /> Download
           </a>
           <a
             href="https://github.com/pycasa/pycasa"
@@ -388,11 +401,11 @@ export default function App() {
         </div>
       </section>
 
-      {/* ── AI SETUP ── */}
+      {/* ── BYOAI ── */}
       <section id="ai" className="section-ai">
-        <h2 className="section-title">Flexible AI — your choice</h2>
+        <h2 className="section-title">Bring Your Own AI</h2>
         <p className="section-sub">
-          Run AI locally with Ollama, or connect to Gemini or OpenAI. You decide what runs where.
+          Flexible AI - Run AI locally with Ollama, or connect to Gemini or OpenAI. You decide what runs where.
         </p>
         <div className="ai-providers">
           <div className="ai-tabs">
@@ -441,9 +454,8 @@ export default function App() {
         <p className="section-sub">Modern, proven technologies — nothing exotic.</p>
         <div className="stack-grid">
           {[
-            { label: 'Backend', items: ['Quarkus 3.6 (Java 17)', 'Couchbase Lite', 'Ollama4j', 'Tess4J (OCR)', 'WebSockets'] },
-            { label: 'Frontend', items: ['React 18 + Vite 5', 'Tailwind CSS', 'shadcn/ui', 'React Router v6', 'Framer Motion'] },
-            { label: 'Build & Deploy', items: ['Quarkus Quinoa', 'Single uber-JAR', 'Docker support', 'Maven 3.8+', 'Makefile'] },
+            { label: 'Backend', items: ['Quarkus 3.6 (Java 17)', 'Couchbase Lite', 'Ollama4j', 'Tess4J (OCR)'] },
+            { label: 'Frontend', items: ['React 18 + Vite 5', 'Tailwind CSS', 'shadcn/ui','Framer Motion'] },
           ].map((col) => (
             <div key={col.label} className="stack-col">
               <h3 className="stack-label">{col.label}</h3>
@@ -471,7 +483,12 @@ export default function App() {
           <div className="terminal-header">
             <span className="dot red" /><span className="dot yellow" /><span className="dot green" />
             <div className="terminal-tabs">
-              {Object.entries({ jar: 'Executable JAR', docker: 'Docker', build: 'Build Source' }).map(([k, label]) => (
+              {Object.entries({
+                windows: 'Windows',
+                jar: 'Executable JAR',
+                docker: 'Docker',
+                build: 'Build Source',
+              }).map(([k, label]) => (
                 <button
                   key={k}
                   className={`t-tab ${activeTab === k ? 'active' : ''}`}
@@ -481,36 +498,47 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <button className="copy-btn" onClick={copyToClipboard} title="Copy">
-              {copied ? <CheckIcon /> : <CopyIcon />}
-            </button>
+            {activeTab !== 'windows' && (
+              <button className="copy-btn" onClick={copyToClipboard} title="Copy">
+                {copied ? <CheckIcon /> : <CopyIcon />}
+              </button>
+            )}
           </div>
-          <div className="terminal-body">
-            <div className="t-comment">{installCommands[activeTab].comment}</div>
-            <div className="t-line">
-              <span className="t-prompt">$</span>
-              <span className="t-cmd">{installCommands[activeTab].cmd}</span>
+
+          {activeTab === 'windows' ? (
+            <div className="windows-download-body">
+              <div className="windows-download-icon">
+                <img src="./site-images/windows.png" alt="Windows" />
+              </div>
+              <div className="windows-download-info">
+                <div className="windows-download-title">Pycasa for Windows</div>
+                <div className="windows-download-version">
+                  Latest release: <span className="windows-version-tag">{latestVersion}</span>
+                </div>
+                <div className="windows-download-note">
+                  Windows 10 / 11 · 64-bit installer · Requires Java 17+
+                </div>
+              </div>
+              <a
+                href={`https://github.com/Pycasa/Pycasa/releases/download/${latestVersion}/PycasaSetup-${latestVersion}.exe`}
+                className="windows-download-btn"
+                download
+              >
+                <DownloadIcon /> Download .exe
+              </a>
             </div>
-          </div>
+          ) : (
+            <div className="terminal-body">
+              <div className="t-comment">{installCommands[activeTab].comment}</div>
+              <div className="t-line">
+                <span className="t-prompt">$</span>
+                <span className="t-cmd">{installCommands[activeTab].cmd}</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="prereqs">
-          <h3>Development - Prerequisites</h3>
-          <div className="prereq-grid">
-            {[
-              { name: 'Java', version: '17+', required: true },
-              { name: 'Maven', version: '3.8+', required: false, note: 'build only' },
-              { name: 'Node.js', version: '18+', required: false, note: 'build only' },
-              { name: 'Ollama', version: 'any', required: false, note: 'optional, for AI' },
-            ].map((p) => (
-              <div key={p.name} className="prereq-item">
-                <span className="prereq-name">{p.name}</span>
-                <span className="prereq-version">{p.version}</span>
-                {p.note && <span className="prereq-note">{p.note}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
+       
 
         <div className="default-creds">
           <span className="creds-icon">🔑</span>
@@ -520,6 +548,7 @@ export default function App() {
           </div>
         </div>
       </section>
+      </div>
 
       {/* ── FOOTER ── */}
       <footer>

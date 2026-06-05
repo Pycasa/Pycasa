@@ -125,45 +125,62 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
     private void analyseWithOllama(ImageRecord img, AppSettings settings) throws Exception {
         String ollamaUrl = settings.ollama_url != null ? settings.ollama_url : "http://localhost:11434";
         String visionModel = settings.vision_model != null ? settings.vision_model : "llava";
+        String textModel = settings.text_model != null ? settings.text_model : "llama2";
 
         Ollama ollama = new Ollama(ollamaUrl);
         ollama.setRequestTimeoutSeconds(120);
 
-        String prompt = (settings.image_analysis_prompt != null && !settings.image_analysis_prompt.isBlank())
+        // --- Call 1: vision model generates a description from the image ---
+        String descriptionPrompt = (settings.image_analysis_prompt != null && !settings.image_analysis_prompt.isBlank())
                 ? settings.image_analysis_prompt
-                : "Describe this image in detail. Then on a new line starting with 'Tags:', list 5-10 relevant tags separated by commas.";
+                : "Describe this image in detail. Focus on the subjects, setting, colors, mood, and any notable elements.";
 
-        OllamaGenerateRequest request = OllamaGenerateRequest.builder()
+        OllamaGenerateRequest descRequest = OllamaGenerateRequest.builder()
                 .withModel(visionModel)
-                .withPrompt(prompt)
+                .withPrompt(descriptionPrompt)
                 .withImages(List.of(new File(img.file_path)))
                 .build();
 
-        OllamaResult result = ollama.generate(request, null);
-        parseAndSaveAnalysis(img, result.getResponse());
-    }
+        OllamaResult descResult = ollama.generate(descRequest, null);
+        String description = descResult.getResponse().trim();
 
-    private void parseAndSaveAnalysis(ImageRecord img, String response) {
-        String description = response;
-        List<String> tags = new ArrayList<>();
+        LOG.debugf("Description for %s: %s", img.file_path, description);
 
-        int tagsIdx = response.toLowerCase().indexOf("tags:");
-        if (tagsIdx >= 0) {
-            description = response.substring(0, tagsIdx).trim();
-            String tagsPart = response.substring(tagsIdx + 5).trim();
-            for (String t : tagsPart.split(",")) {
-                String tag = t.trim().toLowerCase().replaceAll("[^a-z0-9\\s\\-]", "");
-                if (!tag.isBlank()) tags.add(tag);
-            }
-        }
-        if (description != null && !description.isBlank()) {
-            img.description = description.trim();
-        }
-        if (!tags.isEmpty()) {
-            img.tags = tags;
-        }
+        // --- Call 2: text model generates tags from the description ---
+        String tagsPrompt = "Given the following image description, extract 5-10 relevant tags. "
+                + "Return only the tags as a comma-separated list with no additional text or explanation.\n\n"
+                + "Description: " + description;
+
+        OllamaGenerateRequest tagsRequest = OllamaGenerateRequest.builder()
+                .withModel(textModel)
+                .withPrompt(tagsPrompt)
+                .build();
+
+        OllamaResult tagsResult = ollama.generate(tagsRequest, null);
+        List<String> tags = parseTags(tagsResult.getResponse());
+
+        LOG.debugf("Tags for %s: %s", img.file_path, tags);
+
+        // --- Persist results ---
+        img.description = description;
+        img.tags = tags;
         img.ai_analysed = true;
         db.save(img.id, img);
+    }
+
+    private List<String> parseTags(String response) {
+        List<String> tags = new ArrayList<>();
+        // Strip any leading label like "Tags:" that the model may include despite instructions
+        String raw = response.trim();
+        int colonIdx = raw.toLowerCase().indexOf("tags:");
+        if (colonIdx >= 0) {
+            raw = raw.substring(colonIdx + 5).trim();
+        }
+        for (String t : raw.split(",")) {
+            String tag = t.trim().toLowerCase().replaceAll("[^a-z0-9\\s\\-]", "").trim();
+            if (!tag.isBlank()) tags.add(tag);
+        }
+        return tags;
     }
 
     public boolean pingOllama(String url) {

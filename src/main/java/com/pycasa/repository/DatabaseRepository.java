@@ -432,6 +432,15 @@ public class DatabaseRepository {
     }
 
     public void deleteImagesByFolderId(String folderId) {
+        deleteImagesByFolderIdWithProgress(folderId, null);
+    }
+
+    @FunctionalInterface
+    public interface DeleteProgressCallback {
+        void onProgress(int deleted, int total);
+    }
+
+    public void deleteImagesByFolderIdWithProgress(String folderId, DeleteProgressCallback callback) {
         try {
             Query q = QueryBuilder.select(SelectResult.expression(Meta.id))
                     .from(DataSource.collection(defaultCollection))
@@ -439,16 +448,24 @@ public class DatabaseRepository {
                             .and(Expression.property("folder_id").equalTo(Expression.string(folderId))));
             ResultSet rs = q.execute();
             List<Result> results = rs.allResults();
-            LOG.infof("Deleting %d image records for folder %s", results.size(), folderId);
+            int total = results.size();
+            LOG.infof("Deleting %d image records for folder %s", total, folderId);
+
+            int deleted = 0;
             for (Result r : results) {
-                String docId = r.getString(0); // Meta.id
+                String docId = r.getString(0);
                 if (docId != null) {
                     Document doc = defaultCollection.getDocument(docId);
                     if (doc != null) defaultCollection.delete(doc);
                 }
+                deleted++;
+                if (callback != null) {
+                    callback.onProgress(deleted, total);
+                }
             }
         } catch (Exception e) {
-            LOG.warnf("deleteImagesByFolderId failed for folder %s: %s", folderId, e.getMessage());
+            LOG.warnf("deleteImagesByFolderIdWithProgress failed for folder %s: %s", folderId, e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 

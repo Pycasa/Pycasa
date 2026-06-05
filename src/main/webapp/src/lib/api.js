@@ -122,6 +122,10 @@ class ApiClient {
     removeMonitored: (folderId) => this.request(`/folders/${folderId}`, {
       method: 'DELETE',
     }),
+    rescanFolder: (folderId) => this.request(`/folders/${folderId}/rescan`, {
+      method: 'POST',
+    }),
+    getScanningFolders: () => this.request('/folders/scanning'),
     getHierarchy: (folderId) => this.request(`/folders/${folderId}/hierarchy`),
     listDir: (path = null) => {
       const params = new URLSearchParams();

@@ -92,7 +92,7 @@ The jar includes the full UI. No separate web server needed.
 
 ---
 
-## AI Setup (optional)
+## BYOAI (optional)
 
 Pycasa uses [Ollama](https://ollama.com) for fully local AI — no API keys, no data sent to the cloud.
 

@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Folder, Plus, Trash2, HardDrive, AlertCircle, CheckCircle2, FolderOpen, Bot, Settings2, Info, Save, Loader2, PlayCircle, Play, RotateCw } from 'lucide-react';
+import { Folder, Plus, Trash2, HardDrive, AlertCircle, CheckCircle2, FolderOpen, Bot, Settings2, Info, Save, Loader2, PlayCircle, Play, RotateCw, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import FolderPicker from './FolderPicker';
 import CreatableSelect from 'react-select/creatable';
 import { useTheme } from '@/context/ThemeContext';
+import { useNotifications } from '@/context/NotificationsContext';
 
 const FolderSettings = () => {
     // Scan Locations State
@@ -48,6 +49,10 @@ const FolderSettings = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { theme } = useTheme();
+    const { liveProgress } = useNotifications();
+
+    // Track which folder IDs currently have an active scan
+    const [scanningFolderIds, setScanningFolderIds] = useState(new Set());
 
     const isDark = theme === 'dark';
     const selectStyles = {
@@ -172,7 +177,23 @@ const FolderSettings = () => {
         fetchTrashPath();
         loadAiSettings();
         fetchModels();
+
+        // Fetch which folders are already scanning when the page loads
+        api.folders.getScanningFolders().then(ids => {
+            if (Array.isArray(ids)) setScanningFolderIds(new Set(ids));
+        }).catch(() => {});
     }, []);
+
+    // Keep scanningFolderIds in sync with live WebSocket progress events
+    useEffect(() => {
+        const active = new Set();
+        Object.keys(liveProgress).forEach(key => {
+            // Keys are like "scan:folder:progress:<folderId>" or "scan:cancelling:<folderId>"
+            const match = key.match(/^scan:(?:folder:progress|cancelling):(.+)$/);
+            if (match) active.add(match[1]);
+        });
+        setScanningFolderIds(active);
+    }, [liveProgress]);
 
     const fetchModels = async (url = null) => {
         try {
@@ -316,6 +337,15 @@ const FolderSettings = () => {
         }
     };
 
+    const handleRescanFolder = async (id) => {
+        try {
+            await api.folders.rescanFolder(id);
+            toast({ title: "Rescan started", description: "Scanning folder for new images." });
+        } catch (error) {
+            toast({ title: "Failed to start rescan", description: error.message, variant: "destructive" });
+        }
+    };
+
     return (
         <div className="max-w-4xl mx-auto space-y-4 py-4 animate-in fade-in duration-500">
             <div className="flex flex-col gap-2">
@@ -453,6 +483,19 @@ const FolderSettings = () => {
                                                     <CheckCircle2 className="w-3 h-3" />
                                                     Active
                                                 </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleRescanFolder(folder.id)}
+                                                    disabled={scanningFolderIds.has(folder.id)}
+                                                    title={scanningFolderIds.has(folder.id) ? "Scan in progress…" : "Rescan folder"}
+                                                    className="text-slate-400 hover:text-primary transition-colors disabled:opacity-40"
+                                                >
+                                                    {scanningFolderIds.has(folder.id)
+                                                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                                                        : <RefreshCw className="w-4 h-4" />
+                                                    }
+                                                </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"

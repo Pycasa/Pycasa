@@ -3,12 +3,12 @@ package com.pycasa.resource;
 import com.pycasa.entity.MonitoredFolder;
 import com.pycasa.repository.DatabaseRepository;
 import com.pycasa.service.FolderScanService;
+import com.pycasa.service.NotificationService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import org.jboss.logging.Logger;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-
 
 import java.io.File;
 import java.util.*;
@@ -26,6 +26,9 @@ public class FolderResource {
 
     @Inject
     FolderScanService scanService;
+
+    @Inject
+    NotificationService notificationService;
 
     @ConfigProperty(name = "couchbase.lite.database.directory")
     String dbDirectory;
@@ -71,19 +74,82 @@ public class FolderResource {
                 req.label() != null ? req.label() : dir.getName()
         );
         db.save(folder.id, folder);
-        // Trigger a scan in the background
-        scanService.triggerScan();
+        // Trigger a scan for this folder only (not all folders)
+        scanService.startFolderScan(folder);
         return Response.ok(folder).build();
+    }
+
+    @GET
+    @Path("/scanning")
+    public Response getScanningFolders() {
+        return Response.ok(scanService.getScanningFolderIds()).build();
+    }
+
+    @POST
+    @Path("/{id}/rescan")
+    public Response rescanFolder(@PathParam("id") String id) {
+        MonitoredFolder folder = db.get(id, MonitoredFolder.class);
+        if (folder == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Folder not found")).build();
+        }
+        if (scanService.isScanningFolder(id)) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("error", "Scan already running for this folder")).build();
+        }
+        scanService.startFolderScan(folder, true);
+        return Response.ok(Map.of("message", "Rescan started")).build();
     }
 
     @DELETE
     @Path("/{id}")
     public Response removeFolder(@PathParam("id") String id) {
-        // First delete all image records that belong to this folder
-        db.deleteImagesByFolderId(id);
-        // Then delete the folder document itself
-        db.delete(id);
-        return Response.ok(Map.of("message", "Folder removed")).build();
+        MonitoredFolder folder = db.get(id, MonitoredFolder.class);
+        String folderLabel = folder != null && folder.label != null ? folder.label : id;
+        String folderPath  = folder != null && folder.path  != null ? folder.path  : id;
+
+        long total = db.countImagesByFolderId(id);
+
+        // Broadcast start event
+        notificationService.broadcast("folder-delete:started", Map.of(
+                "message", "Removing location: " + folderLabel,
+                "folder_id", id,
+                "folder_path", folderPath,
+                "total", total
+        ));
+
+        // Run deletion in a background thread so the response returns immediately
+        new Thread(() -> {
+            try {
+                // Cancel any in-progress scan for this folder first, then wait for it to stop
+                scanService.cancelFolderScan(id);
+
+                db.deleteImagesByFolderIdWithProgress(id, (deleted, ttl) ->
+                        notificationService.broadcast("folder-delete:progress", Map.of(
+                                "folder_id", id,
+                                "deleted", deleted,
+                                "total", ttl
+                        ))
+                );
+                db.delete(id);
+
+                notificationService.broadcast("folder-delete:completed", Map.of(
+                        "message", "Location removed: " + folderLabel,
+                        "folder_id", id,
+                        "folder_path", folderPath,
+                        "total", total
+                ));
+            } catch (Exception e) {
+                LOG.errorf("Failed to delete folder %s: %s", id, e.getMessage());
+                notificationService.broadcast("folder-delete:error", Map.of(
+                        "message", "Failed to remove: " + folderLabel,
+                        "detail", e.getMessage() != null ? e.getMessage() : "unknown error",
+                        "folder_id", id
+                ));
+            }
+        }).start();
+
+        return Response.ok(Map.of("message", "Folder removal started")).build();
     }
 
     @GET
