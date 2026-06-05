@@ -201,27 +201,31 @@ jobs:
             release-assets/pycasa-${{ github.ref_name }}-runner.jar
             release-assets/PycasaSetup-${{ github.ref_name }}.exe
           body: |
-            ## Docker Image
+            ### Windows
+
+            Download the `PycasaSetup-${{ github.ref_name }}.exe` asset below and run it to install Pycasa on Windows.
+
+            ### Docker Image
 
             Pull and run from Docker Hub:
-            ```
+            ```bash
             docker run -d -p 3000:3000 -v ~/Pictures:/photos pycasa/pycasa:${{ github.ref_name }}
             ```
 
             Or pull and run from GitHub Container Registry:
-            ```
-            echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin
+            ```bash
+            echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin;
             docker run -d -p 3000:3000 -v ~/Pictures:/photos ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
             ```
 
-            ## JAR
+            ### JAR
 
             Download the `pycasa-${{ github.ref_name }}-runner.jar` asset below and run with:
-            ```
+            ```bash
             java -jar pycasa-${{ github.ref_name }}-runner.jar
             ```
             
             And, as always, to download and run latest:
-            ```
+            ```bash
             curl -fsSL https://raw.githubusercontent.com/Pycasa/Pycasa/main/install.sh | bash
             ```
