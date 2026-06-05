@@ -541,10 +541,24 @@ export default function App() {
        
 
         <div className="default-creds">
-          <span className="creds-icon">🔑</span>
-          <div>
-            <strong>Default login:</strong> username <code>admin</code> · password <code>admin</code>
-            <span className="creds-note"></span>
+          <div className="creds-row">
+            <span className="creds-icon">🌐</span>
+            <div className="creds-item">
+              <span className="creds-label">Navigate to URL</span>
+              <a href="http://localhost:3000" target="_blank" rel="noopener noreferrer" className="creds-value creds-link">
+                http://localhost:3000
+              </a>
+            </div>
+          </div>
+          <div className="creds-divider" />
+          <div className="creds-row">
+            <span className="creds-icon">🔑</span>
+            <div className="creds-item">
+              <span className="creds-label">Default credentials</span>
+              <span className="creds-value">
+                Username: <code>admin</code> <span className="creds-sep"> Password: </span> <code>admin</code>
+              </span>
+            </div>
           </div>
         </div>
       </section>
