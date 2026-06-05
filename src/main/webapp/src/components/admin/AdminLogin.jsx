@@ -42,12 +42,15 @@ const AdminLogin = ({ onLoginSuccess }) => {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-2">
             <img
-              src="/site-images/pycasa-logo.png"
+              src="/site-images/logo.png"
               alt="Pycasa Logo"
               className="h-20 w-auto object-contain"
             />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Sign In</h1>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <span className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100 select-none">Pycasa</span>
+          </div>
+          <h1 className="text-md font-bold text-gray-900 dark:text-slate-100">Sign In</h1>
           <p className="text-gray-500 dark:text-slate-400 mt-1 text-xs">Contact your administrator to get access if you don't have an account.</p>
         </div>
 

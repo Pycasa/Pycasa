@@ -280,7 +280,7 @@ const TimelineSlider = ({ groupedSlots, years, activeKey, onNavigate }) => {
             `}</style>
 
             {/* Left side: Month & Year Labels */}
-            <div className="relative flex-1 mr-3 h-full">
+            <div className="relative flex-1 mr-0 h-full">
                 {ticks.map((tick, idx) => {
                     const isActive = idx === activeIndex;
                     const isHoverActive = idx === hoverIndex;

@@ -37,13 +37,24 @@ public class ImageResource {
             @QueryParam("sort_by") @DefaultValue("modified_at") String sortBy,
             @QueryParam("sort_order") @DefaultValue("DESC") String sortOrder,
             @QueryParam("page") @DefaultValue("1") int page,
-            @QueryParam("limit") @DefaultValue("30") int limit, @QueryParam("before") String before) {
+            @QueryParam("limit") @DefaultValue("30") int limit,
+            @QueryParam("before") String before,
+            @QueryParam("date_from") Long dateFrom,
+            @QueryParam("date_to") Long dateTo,
+            @QueryParam("extensions") String extensions,
+            @QueryParam("size_min") Long sizeMin,
+            @QueryParam("size_max") Long sizeMax) {
 
         List<String> tagList = (tags != null && !tags.isBlank())
                 ? Arrays.asList(tags.split(","))
                 : null;
 
-        List<ImageRecord> images = db.listImages(folderId, search, tagList, sortBy, sortOrder, page, limit);
+        List<String> extList = (extensions != null && !extensions.isBlank())
+                ? Arrays.asList(extensions.split(","))
+                : null;
+
+        List<ImageRecord> images = db.listImages(folderId, search, tagList, sortBy, sortOrder, page, limit,
+                dateFrom, dateTo, extList, sizeMin, sizeMax);
         return Response.ok(images).build();
     }
 

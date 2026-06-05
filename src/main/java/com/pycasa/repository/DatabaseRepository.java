@@ -266,7 +266,9 @@ public class DatabaseRepository {
     // -------------------------------------------------------------------------
 
     public List<ImageRecord> listImages(String folderId, String search, List<String> tags,
-                                        String sortBy, String sortOrder, int page, int limit) {
+                                        String sortBy, String sortOrder, int page, int limit,
+                                        Long dateFrom, Long dateTo, List<String> extensions,
+                                        Long sizeMin, Long sizeMax) {
         try {
             Expression where = Expression.property("type").equalTo(Expression.string("image"));
             if (folderId != null && !folderId.isBlank()) {
@@ -278,6 +280,18 @@ public class DatabaseRepository {
                         Expression.property("file_path").like(Expression.string(lc))
                                 .or(Expression.property("description").like(Expression.string(lc)))
                 );
+            }
+            if (dateFrom != null) {
+                where = where.and(Expression.property("modified_at").greaterThanOrEqualTo(Expression.longValue(dateFrom)));
+            }
+            if (dateTo != null) {
+                where = where.and(Expression.property("modified_at").lessThanOrEqualTo(Expression.longValue(dateTo)));
+            }
+            if (sizeMin != null) {
+                where = where.and(Expression.property("file_size").greaterThanOrEqualTo(Expression.longValue(sizeMin)));
+            }
+            if (sizeMax != null) {
+                where = where.and(Expression.property("file_size").lessThanOrEqualTo(Expression.longValue(sizeMax)));
             }
 
             String col = switch (sortBy != null ? sortBy : "modified_at") {
@@ -300,8 +314,17 @@ public class DatabaseRepository {
             List<ImageRecord> images = new ArrayList<>();
             for (Result r : rs.allResults()) {
                 ImageRecord img = resultToImageRecord(r);
+                // Tag filter (post-query, Couchbase Lite doesn't support array containsAll natively)
                 if (tags != null && !tags.isEmpty()) {
                     if (img.tags == null || !img.tags.containsAll(tags)) continue;
+                }
+                // Extension filter (post-query, derived from file_path)
+                if (extensions != null && !extensions.isEmpty()) {
+                    String fp = img.file_path != null ? img.file_path.toLowerCase() : "";
+                    int dot = fp.lastIndexOf('.');
+                    String ext = dot >= 0 ? fp.substring(dot + 1) : "";
+                    boolean matched = extensions.stream().anyMatch(e -> e.toLowerCase().equals(ext));
+                    if (!matched) continue;
                 }
                 images.add(img);
             }

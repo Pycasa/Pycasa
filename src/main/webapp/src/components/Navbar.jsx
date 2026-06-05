@@ -79,7 +79,7 @@ const Navbar = ({ isAuthenticated, onLogout, username, activeTab }) => {
 
   const adminNavItems = [
     { id: 'timeline', label: 'Timeline', icon: Calendar },
-    { id: 'gallery',  label: 'Gallery',  icon: ImageIcon },
+    { id: 'gallery', label: 'Gallery', icon: ImageIcon },
   ];
 
   return (
@@ -87,8 +87,11 @@ const Navbar = ({ isAuthenticated, onLogout, username, activeTab }) => {
       <div className="w-full px-4">
         <div className="flex items-center justify-between h-16">
 
-          <Link to="/" className="flex items-center">
-            <img src="/site-images/pycasa-logo.png" alt="Pycasa Logo" className="h-16 w-auto object-contain" />
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src="/site-images/logo.png" alt="Pycasa Logo" className="h-10 w-auto object-contain" />
+            <span className="text-base font-bold tracking-tight text-slate-800 dark:text-slate-100 select-none">
+              Pycasa
+            </span>
           </Link>
 
           {/* Desktop nav */}
@@ -139,11 +142,10 @@ const Navbar = ({ isAuthenticated, onLogout, username, activeTab }) => {
               <Link
                 key={item.id}
                 to={`/${item.id}`}
-                className={`flex items-center space-x-1.5 transition-all h-9 px-2 rounded-lg text-sm font-medium ${
-                  activeTab === item.id
+                className={`flex items-center space-x-1.5 transition-all h-9 px-2 rounded-lg text-sm font-medium ${activeTab === item.id
                     ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
                     : 'text-gray-700 dark:text-slate-300 hover:text-primary hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
+                  }`}
               >
                 <item.icon className="w-4 h-4" />
                 <span>{item.label}</span>
@@ -214,11 +216,10 @@ const Navbar = ({ isAuthenticated, onLogout, username, activeTab }) => {
                   key={item.id}
                   to={`/${item.id}`}
                   onClick={() => setIsOpen(false)}
-                  className={`w-full flex items-center space-x-3 py-3 px-4 rounded-lg transition-all ${
-                    activeTab === item.id
+                  className={`w-full flex items-center space-x-3 py-3 px-4 rounded-lg transition-all ${activeTab === item.id
                       ? 'bg-primary text-white shadow-md'
                       : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
-                  }`}
+                    }`}
                 >
                   <item.icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>

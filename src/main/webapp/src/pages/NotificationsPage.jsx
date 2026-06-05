@@ -11,14 +11,14 @@ import { Badge } from '@/components/ui/badge';
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 const EVENT_META = {
-    'scan:started':   { icon: ScanLine,     color: 'text-blue-500',   bg: 'bg-blue-50',   border: 'border-blue-100',   label: 'Scan started',          category: 'scan' },
-    'scan:progress':  { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50', border: 'border-indigo-100', label: 'Scanning',              category: 'scan' },
-    'scan:completed': { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50',  border: 'border-green-100',  label: 'Scan complete',         category: 'scan' },
-    'scan:error':     { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50',    border: 'border-red-100',    label: 'Scan error',            category: 'scan' },
-    'ai:started':     { icon: Sparkles,     color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-100', label: 'AI analysis started',   category: 'ai'   },
-    'ai:progress':    { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50', border: 'border-indigo-100', label: 'Analysing',             category: 'ai'   },
-    'ai:completed':   { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50',  border: 'border-green-100',  label: 'AI analysis complete',  category: 'ai'   },
-    'ai:error':       { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50',    border: 'border-red-100',    label: 'AI error',              category: 'ai'   },
+    'scan:started':   { icon: ScanLine,     color: 'text-blue-500',   bg: 'bg-blue-50 dark:bg-blue-950/40',     border: 'border-blue-100 dark:border-blue-900/60',     label: 'Scan started',          category: 'scan' },
+    'scan:progress':  { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-100 dark:border-indigo-900/60', label: 'Scanning',              category: 'scan' },
+    'scan:completed': { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-950/40',   border: 'border-green-100 dark:border-green-900/60',   label: 'Scan complete',         category: 'scan' },
+    'scan:error':     { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-950/40',       border: 'border-red-100 dark:border-red-900/60',       label: 'Scan error',            category: 'scan' },
+    'ai:started':     { icon: Sparkles,     color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-100 dark:border-purple-900/60', label: 'AI analysis started',   category: 'ai'   },
+    'ai:progress':    { icon: Loader2,      color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-100 dark:border-indigo-900/60', label: 'Analysing',             category: 'ai'   },
+    'ai:completed':   { icon: CheckCircle2, color: 'text-green-500',  bg: 'bg-green-50 dark:bg-green-950/40',   border: 'border-green-100 dark:border-green-900/60',   label: 'AI analysis complete',  category: 'ai'   },
+    'ai:error':       { icon: AlertCircle,  color: 'text-red-500',    bg: 'bg-red-50 dark:bg-red-950/40',       border: 'border-red-100 dark:border-red-900/60',       label: 'AI error',              category: 'ai'   },
 };
 
 const FILTER_OPTIONS = [
@@ -123,7 +123,7 @@ const NotificationsPage = () => {
                         <select
                             value={filterType}
                             onChange={e => setFilterType(e.target.value)}
-                            className="h-9 pl-8 pr-8 text-sm bg-white border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 appearance-none cursor-pointer"
+                            className="h-9 pl-8 pr-8 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600 appearance-none cursor-pointer"
                         >
                             {FILTER_OPTIONS.map(o => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -171,28 +171,28 @@ const NotificationsPage = () => {
                             return (
                                 <div
                                     key={n.id}
-                                    className={`group flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${n.read ? 'bg-white border-slate-100' : `${meta.bg} ${meta.border}`}`}
+                                    className={`group flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${n.read ? 'bg-white dark:bg-slate-800/60 border-slate-100 dark:border-slate-700/60' : `${meta.bg} ${meta.border}`}`}
                                 >
-                                    <div className={`mt-0.5 p-1.5 rounded-lg ${n.read ? 'bg-slate-100' : meta.bg} shrink-0`}>
-                                        <Icon className={`w-4 h-4 ${n.read ? 'text-slate-400' : meta.color}`} />
+                                    <div className={`mt-0.5 p-1.5 rounded-lg ${n.read ? 'bg-slate-100 dark:bg-slate-700' : meta.bg} shrink-0`}>
+                                        <Icon className={`w-4 h-4 ${n.read ? 'text-slate-400 dark:text-slate-500' : meta.color}`} />
                                     </div>
 
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className={`text-xs font-semibold ${n.read ? 'text-slate-500' : 'text-slate-800'}`}>
+                                            <span className={`text-xs font-semibold ${n.read ? 'text-slate-500 dark:text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>
                                                 {meta.label}
                                             </span>
                                             {!n.read && (
                                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                                             )}
                                         </div>
-                                        <p className={`text-xs mt-0.5 ${n.read ? 'text-slate-400' : 'text-slate-600'}`}>
+                                        <p className={`text-xs mt-0.5 ${n.read ? 'text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-300'}`}>
                                             {n.message}
                                         </p>
                                         {n.detail && (
-                                            <p className="text-[10px] text-slate-400 mt-0.5 font-mono truncate">{n.detail}</p>
+                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-mono truncate">{n.detail}</p>
                                         )}
-                                        <p className="text-[10px] text-slate-400 mt-1">{formatDateTime(n.ts)}</p>
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{formatDateTime(n.ts)}</p>
                                     </div>
 
                                     {/* Per-item actions — visible on hover */}
@@ -201,7 +201,7 @@ const NotificationsPage = () => {
                                             <button
                                                 onClick={() => markRead(n.id)}
                                                 title="Mark as read"
-                                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                                             >
                                                 <CheckCheck className="w-3.5 h-3.5" />
                                             </button>
@@ -209,7 +209,7 @@ const NotificationsPage = () => {
                                         <button
                                             onClick={() => deleteOne(n.id)}
                                             title="Delete"
-                                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>

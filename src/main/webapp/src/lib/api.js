@@ -138,11 +138,16 @@ class ApiClient {
 
   // Images API
   images = {
-    list: (folderId = null, search = null, tags = null, sortBy = 'modified_at', sortOrder = 'DESC', page = 1, limit = 30) => {
+    list: (folderId = null, search = null, tags = null, sortBy = 'modified_at', sortOrder = 'DESC', page = 1, limit = 30, dateFrom = null, dateTo = null, extensions = null, sizeMin = null, sizeMax = null) => {
       const params = new URLSearchParams({ page, limit, sort_by: sortBy, sort_order: sortOrder });
       if (folderId) params.append('folder_id', folderId);
       if (search) params.append('search', search);
       if (tags && tags.length > 0) params.append('tags', tags.join(','));
+      if (dateFrom) params.append('date_from', dateFrom);
+      if (dateTo) params.append('date_to', dateTo);
+      if (extensions && extensions.length > 0) params.append('extensions', extensions.join(','));
+      if (sizeMin != null) params.append('size_min', sizeMin);
+      if (sizeMax != null) params.append('size_max', sizeMax);
       return this.request(`/images?${params.toString()}`);
     },
     getMetadata: (path = null, id = null) => {
