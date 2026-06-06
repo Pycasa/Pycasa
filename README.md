@@ -92,8 +92,6 @@ java -jar target/pycasa-server-*-runner.jar
 
 The jar includes the full UI. No separate web server needed.
 
----
-
 ## BYOAI (optional)
 
 Pycasa uses [Ollama](https://ollama.com) for fully local AI — no API keys, no data sent to the cloud.
@@ -106,8 +104,6 @@ Pycasa uses [Ollama](https://ollama.com) for fully local AI — no API keys, no 
    ollama pull nomic-embed-text  # embeddings — semantic search
    ```
 3. In Pycasa, go to **Settings → AI** and enter your Ollama URL (`http://localhost:11434`)
-
----
 
 ## OCR Setup (optional)
 
@@ -123,11 +119,9 @@ Pycasa uses [Tesseract](https://github.com/tesseract-ocr/tesseract) for text ext
    ```
 2. In Pycasa, go to **Settings → OCR** and set the Tesseract data path (e.g. `/usr/share/tesseract-ocr/4.00/tessdata`)
 
----
+## API Playground
 
-## API
-
-Swagger UI is available at **http://localhost:3000/docs** when the server is running.
+API playground is available at **http://localhost:3000/docs** when the server is running.
 
 ## Tech Stack
 
@@ -142,9 +136,6 @@ Swagger UI is available at **http://localhost:3000/docs** when the server is run
 - [Tailwind CSS](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com)
 - [React Router](https://reactrouter.com)
 
-**Build**
-- [Quinoa](https://quarkiverse.github.io/quarkiverse-docs/quarkus-quinoa/dev/) — Quarkus extension that manages the Vite dev server and bundles the UI into the jar
-
 ---
 
 ## Contributing
@@ -156,8 +147,8 @@ Contributions are welcome. Please open an issue before submitting a large PR so 
 3. Make your changes
 4. Open a pull request
 
----
+### Appreciate the work
 
-## License
-
-MIT
+<p align="center">
+  <a href="https://www.buymeacoffee.com/amithkoujalgi" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+</p>
