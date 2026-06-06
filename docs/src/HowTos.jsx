@@ -423,10 +423,7 @@ export default function HowTosPage({ navbar }) {
                     {/* Page header */}
                     <div className="ht-header">
                         <h1 className="ht-title">How-To Guides</h1>
-                        <p className="ht-subtitle">
-                            Everything you need to get the most out of Pycasa — from adding folders
-                            to running AI analysis.
-                        </p>
+                        <p className="ht-subtitle">How-To guides for using Pycasa.</p>
                     </div>
 
                     {/* Sections */}
