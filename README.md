@@ -33,6 +33,11 @@ Pycasa is a self-hosted photo management application that runs entirely on your 
 - **Embedded database** — uses [Couchbase Lite](https://www.couchbase.com/products/lite/) — no external database to install or manage
 - **Single binary** — ships as a self-contained jar with the UI bundled inside
 
+## Roadmap
+
+- **Backends** — S3, NFS connectors
+
+
 <div align="center">
    <img height="400" alt="ai-service-select" src="https://github.com/user-attachments/assets/a4d3e44f-fdcc-48eb-b671-fd069074e7dc" />
    <img height="400" alt="ai-service-ollama" src="https://github.com/user-attachments/assets/19a65b15-6a61-44c8-8064-b58eecf51b10" />
