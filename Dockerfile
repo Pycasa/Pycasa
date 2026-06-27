@@ -1,45 +1,37 @@
 # =========================================================
-# BUILD STAGE
+# BUILD STAGE (Build React Frontend)
 # =========================================================
-FROM maven:3.9.9-eclipse-temurin-17 AS builder
+FROM node:22-alpine AS builder
 
-# Install required packages
-RUN apt-get update && apt-get install -y \
-    curl \
-    make \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js 22
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs
-
-# Working directory
 WORKDIR /app
 
-# Copy project files
+# Copy webapp package files
+COPY src/main/webapp/package*.json ./src/main/webapp/
+RUN cd src/main/webapp && npm install
+
+# Copy all source
 COPY . .
 
-# Debug info
-RUN java -version
-RUN mvn -version
-RUN node -v
-RUN npm -v
-
-# Build application
-RUN make build
+# Build webapp
+RUN cd src/main/webapp && npm run build
 
 # =========================================================
-# RUNTIME STAGE
+# RUNTIME STAGE (FastAPI Backend)
 # =========================================================
-FROM eclipse-temurin:17-jre
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy Quarkus runner JAR
-COPY --from=builder /app/target/*-runner.jar app.jar
+# Copy requirements & install
+COPY server/requirements.txt ./server/
+RUN pip install --no-cache-dir -r server/requirements.txt
+
+# Copy source code and the compiled frontend dist
+COPY server/ ./server/
+COPY --from=builder /app/src/main/webapp/dist ./src/main/webapp/dist
 
 # Expose app port
-EXPOSE 8080
+EXPOSE 3000
 
-# Run app
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Run FastAPI app
+CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "3000"]

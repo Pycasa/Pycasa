@@ -25,6 +25,7 @@ function App() {
                                         <Route path="/gallery" element={<AdminPage />} />
                                         <Route path="/favorites" element={<AdminPage />} />
                                         <Route path="/trash" element={<AdminPage />} />
+                                        <Route path="/places" element={<AdminPage />} />
                                         <Route path="/photos/:id" element={<AdminPage />} />
                                         <Route path="/settings" element={<AdminPage />} />
                                         <Route path="/settings/*" element={<AdminPage />} />

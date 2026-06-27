@@ -1,9 +1,6 @@
-# Makefile for Pycasa
-
-.PHONY: help dev build killall pre-dev
+.PHONY: help dev build killall pre-dev check-formatting apply-formatting build-docs clean-docs docs-serve
 
 ROOT_DIR := $(shell pwd)
-MVN      := mvn
 
 help: ## Show available commands
 	@echo "Pycasa"
@@ -13,79 +10,93 @@ help: ## Show available commands
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
 
 pre-dev: # check and setup dev env
-	@command -v $(MVN) >/dev/null 2>&1 || \
-		{ echo "Error: Maven (mvn) is not installed."; exit 1; }
+	@command -v python3 >/dev/null 2>&1 || \
+		{ echo "Error: Python 3 is not installed."; exit 1; }
 	@command -v node >/dev/null 2>&1 || \
 		{ echo "Error: Node.js is not installed."; exit 1; }
 	@command -v npm >/dev/null 2>&1 || \
 		{ echo "Error: npm is not installed."; exit 1; }
+
 	@echo "Setting up dev environment..."
-	@command -v pre-commit >/dev/null 2>&1 || { echo "Error: pre-commit is not installed. Please install it first. using 'pip install pre-commit' or 'brew install pre-commit'"; exit 1; }
+
+	@if [ ! -d ".venv" ]; then \
+		echo "Creating virtual environment..."; \
+		python3 -m venv .venv; \
+	fi
+
+	@echo "Installing python dependencies..."
+	@.venv/bin/pip install --upgrade pip
+	@.venv/bin/pip install -r server/requirements.txt
+
+	@command -v pre-commit >/dev/null 2>&1 || \
+		{ echo "Error: pre-commit is not installed. Please install it first using 'pip install pre-commit' or 'brew install pre-commit'"; exit 1; }
+
 	@pre-commit install
 	@pre-commit autoupdate
 	@pre-commit install --install-hooks
 
 check-formatting:
-	@echo "\033[0;34mChecking Java formatting...\033[0m"
-	@mvn spotless:check
 	@echo "\033[0;34mChecking JS/JSX/CSS/HTML formatting (webapp)...\033[0m"
 	@cd $(ROOT_DIR)/src/main/webapp && npm run format:check
+
 	@echo "\033[0;34mChecking JS/JSX/CSS/HTML formatting (docs)...\033[0m"
 	@cd $(ROOT_DIR)/docs && npm run format:check
 
 apply-formatting:
-	@echo "\033[0;32mFormatting Java files...\033[0m"
-	@mvn spotless:apply
 	@echo "\033[0;32mFormatting JS/JSX/CSS/HTML files (webapp)...\033[0m"
 	@cd $(ROOT_DIR)/src/main/webapp && npm run format
+
 	@echo "\033[0;32mFormatting JS/JSX/CSS/HTML files (docs)...\033[0m"
 	@cd $(ROOT_DIR)/docs && npm run format
 
 killall:
-	@lsof -ti :3000 | xargs kill -9
+	@lsof -ti :3000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti :4173 | xargs kill -9 2>/dev/null || true
 
 # ==============================
-# Development  (hot reload)
+# Development (hot reload)
 # ==============================
-#
-# Quinoa starts the Vite dev server internally and proxies it through Quarkus.
-# Everything is on ONE port
-#
-#   UI changes  → instant HMR (Vite running behind the scenes)
-#   Java changes → Quarkus hot reloads on next request
-#
-dev: pre-dev killall ## Hot-reload dev mode
+dev: pre-dev killall ## Hot-reload dev mode (FastAPI + Vite)
 	@echo ""
 	@echo "Starting Pycasa in dev mode..."
 	@echo ""
-	@cd $(ROOT_DIR) && $(MVN) quarkus:dev
+
+	@cd $(ROOT_DIR)/src/main/webapp && [ -d node_modules ] || npm install
+
+	@cd $(ROOT_DIR) && \
+		PYCASA_ENV=development \
+		exec src/main/webapp/node_modules/.bin/concurrently \
+			--handle-input \
+			--kill-others \
+			--kill-others-on-fail \
+			"cd src/main/webapp && npm run dev" \
+			".venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 3000 --reload --reload-dir server"
 
 # ==============================
-# Build  (production)
+# Build (production)
 # ==============================
-#
-# Produces a single self-contained uber-jar with the UI bundled inside.
-# Quinoa runs npm install + npm run build automatically during mvn package.
-#
-build: pre-dev ## Build production uber-jar with UI embedded
+build: pre-dev ## Build production webapp assets
 	@echo "Building production package..."
-	@cd $(ROOT_DIR) && $(MVN) clean package
-	@JAR_FILE=$$(cd $(ROOT_DIR) && $(MVN) help:evaluate -Dexpression=project.build.finalName -q -DforceStdout); \
-	echo ""; \
-	echo "Run with:"; \
-	echo "  java -jar target/$$JAR_FILE-runner.jar"; \
-	echo ""
+
+	@cd $(ROOT_DIR)/src/main/webapp && [ -d node_modules ] || npm install
+	@cd $(ROOT_DIR)/src/main/webapp && npm run build
+
+	@echo ""
+	@echo "Production assets built in src/main/webapp/dist."
+	@echo "To run the production server:"
+	@echo "  .venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 3000"
+	@echo ""
 
 build-docs:
 	@echo "Building docs artifacts..."
-	cd docs && [ -d node_modules ] || npm install
-	cd docs && npm run build
+	@cd docs && [ -d node_modules ] || npm install
+	@cd docs && npm run build
 
 clean-docs:
 	@echo "Cleaning docs artifacts..."
-	rm -rf docs/dist
+	@rm -rf docs/dist
 
 docs-serve: clean-docs
 	@echo "Starting docs development server..."
-	cd docs && [ -d node_modules ] || npm install
-	cd docs && npm run dev
+	@cd docs && [ -d node_modules ] || npm install
+	@cd docs && npm run dev

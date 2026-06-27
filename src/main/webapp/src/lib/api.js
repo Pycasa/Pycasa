@@ -26,6 +26,10 @@ class ApiClient {
             ...options,
         };
 
+        if (options.body instanceof FormData) {
+            delete config.headers['Content-Type'];
+        }
+
         if (key) {
             config.headers['Authorization'] = `Bearer ${key}`;
         }
@@ -224,6 +228,17 @@ class ApiClient {
         restore: (id) => this.request(`/images/${id}/restore`, { method: 'POST' }),
         listTrashed: (page = 1, limit = 50) =>
             this.request(`/images?trashed=true&page=${page}&limit=${limit}`),
+        upload: (files) => {
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            return this.request('/images/upload', {
+                method: 'POST',
+                body: formData,
+            });
+        },
+        listGeolocated: (limit = 5000) => this.request(`/images/geolocated?limit=${limit}`),
     };
 
     // Settings API

@@ -202,6 +202,14 @@ const ImageManager = () => {
         }
     };
 
+    useEffect(() => {
+        const handleUpload = () => {
+            fetchImages(1, true);
+        };
+        window.addEventListener('pycasa-image-uploaded', handleUpload);
+        return () => window.removeEventListener('pycasa-image-uploaded', handleUpload);
+    }, []);
+
     const loadMore = useCallback(() => {
         if (!loading && hasMore) {
             fetchImages(page + 1);

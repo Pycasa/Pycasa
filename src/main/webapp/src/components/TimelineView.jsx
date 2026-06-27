@@ -293,7 +293,7 @@ const TimelineSlider = ({ groupedSlots, years, activeKey, onNavigate }) => {
                 }
             `}</style>
 
-            {/* Left side: Pure Year Labels (Immich layout) */}
+            {/* Left side: Pure Year Labels (modern layout) */}
             <div className="relative flex-1 mr-2 h-full">
                 {ticks.map((tick, idx) => {
                     const isActive = idx === activeIndex;
@@ -353,7 +353,7 @@ const TimelineSlider = ({ groupedSlots, years, activeKey, onNavigate }) => {
                     onScrubEnd={handleScrubEnd}
                 />
 
-                {/* Floating Date Badge on Hover (Immich style) */}
+                {/* Floating Date Badge on Hover (modern style) */}
                 {isHovering && hoverPercent !== null && hoverIndex !== -1 && ticks[hoverIndex] && (
                     <div
                         className="absolute right-10 bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-xl border border-indigo-400/20 whitespace-nowrap z-50 pointer-events-none -translate-y-1/2 flex items-center"
@@ -395,56 +395,6 @@ const TimelineView = () => {
     const imagesRef = useRef(images);
     const requestedPagesRef = useRef(new Set());
 
-    // Sync grid size selection to local storage
-    useEffect(() => {
-        localStorage.setItem('pycasa-grid-size', gridSize);
-    }, [gridSize]);
-
-    // Keep imagesRef in sync so callbacks can read latest values
-    useEffect(() => {
-        imagesRef.current = images;
-    }, [images]);
-
-    // Sync route /photos/:id with modal state
-    useEffect(() => {
-        if (!id) {
-            setSelectedImageIndex(null);
-            setDirectModalImage(null);
-            return;
-        }
-
-        const idx = imagesRef.current.findIndex((img) => img?.id === id);
-        if (idx !== -1) {
-            setSelectedImageIndex(idx);
-            setDirectModalImage(null);
-        } else {
-            api.images
-                .getMetadata(null, id)
-                .then((img) => {
-                    if (img) {
-                        setDirectModalImage(img);
-                        setSelectedImageIndex(null);
-                    }
-                })
-                .catch((err) => console.error('Error fetching photo details for modal:', err));
-        }
-    }, [id, images]);
-
-    const selectedImage =
-        selectedImageIndex !== null ? images[selectedImageIndex] : directModalImage;
-    const setSelectedImage = useCallback(
-        (img) => {
-            if (!img) {
-                navigate('/timeline');
-                return;
-            }
-            navigate(`/photos/${img.id}`, { state: { background: '/timeline' } });
-        },
-        [navigate]
-    );
-
-    // ── Data fetching ────────────────────────────────────────────────────────
-
     const fetchImages = useCallback(async (pageNum) => {
         try {
             const limit = 50;
@@ -473,23 +423,123 @@ const TimelineView = () => {
         }
     }, []);
 
+    // Sync grid size selection to local storage
     useEffect(() => {
-        const loadTimeline = async () => {
-            setMetadataLoading(true);
-            try {
-                const meta = await api.images.getMetadata();
-                setMetadata(meta);
-                setMetadataLoading(false);
-                requestedPagesRef.current.add(1);
-                await fetchImages(1);
-            } catch (error) {
-                console.error('Failed to load timeline:', error);
-            } finally {
-                setMetadataLoading(false);
+        localStorage.setItem('pycasa-grid-size', gridSize);
+    }, [gridSize]);
+
+    // Keep imagesRef in sync so callbacks can read latest values
+    useEffect(() => {
+        imagesRef.current = images;
+    }, [images]);
+
+    // Sync route /photos/:id with modal state
+    useEffect(() => {
+        if (!id) {
+            setSelectedImageIndex(null);
+            setDirectModalImage(null);
+            return;
+        }
+
+        const idx = images.findIndex((img) => img?.id === id);
+        if (idx !== -1) {
+            setSelectedImageIndex(idx);
+            setDirectModalImage(null);
+        } else {
+            const handleImageMetadata = (img) => {
+                setDirectModalImage(img);
+                setSelectedImageIndex(null);
+
+                if (metadata && img) {
+                    const d = new Date(img.modified_at || img.modified);
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+
+                    const dates = Object.keys(metadata).sort((a, b) => b.localeCompare(a));
+                    let lowerBound = 0;
+                    for (const dateKey of dates) {
+                        if (dateKey > dateStr) {
+                            lowerBound += metadata[dateKey];
+                        } else {
+                            break;
+                        }
+                    }
+                    const countOnDate = metadata[dateStr] || 0;
+                    const upperBound = lowerBound + countOnDate;
+
+                    const limit = 50;
+                    const startPage = Math.floor(lowerBound / limit) + 1;
+                    const endPage = Math.max(startPage, Math.floor((upperBound - 1) / limit) + 1);
+
+                    for (let p = startPage; p <= endPage; p++) {
+                        if (!requestedPagesRef.current.has(p)) {
+                            requestedPagesRef.current.add(p);
+                            fetchImages(p);
+                        }
+                    }
+                }
+            };
+
+            if (directModalImage && directModalImage.id === id) {
+                handleImageMetadata(directModalImage);
+            } else {
+                api.images
+                    .getMetadata(null, id)
+                    .then((img) => {
+                        if (img) {
+                            handleImageMetadata(img);
+                        }
+                    })
+                    .catch((err) => console.error('Error fetching photo details for modal:', err));
             }
-        };
-        loadTimeline();
+        }
+    }, [id, images, metadata, fetchImages, directModalImage]);
+
+    const selectedImage =
+        selectedImageIndex !== null ? images[selectedImageIndex] : directModalImage;
+    const setSelectedImage = useCallback(
+        (img) => {
+            if (!img) {
+                navigate('/timeline');
+                return;
+            }
+            navigate(`/photos/${img.id}`, { state: { background: '/timeline' } });
+        },
+        [navigate]
+    );
+
+    // ── Data fetching ────────────────────────────────────────────────────────
+
+    const loadTimeline = useCallback(async () => {
+        setMetadataLoading(true);
+        try {
+            const meta = await api.images.getMetadata();
+            setMetadata(meta);
+            setMetadataLoading(false);
+            requestedPagesRef.current.add(1);
+            await fetchImages(1);
+        } catch (error) {
+            console.error('Failed to load timeline:', error);
+        } finally {
+            setMetadataLoading(false);
+        }
     }, [fetchImages]);
+
+    useEffect(() => {
+        loadTimeline();
+    }, [loadTimeline]);
+
+    useEffect(() => {
+        const handleUpload = () => {
+            setImages([]);
+            requestedPagesRef.current.clear();
+            loadTimeline();
+        };
+        window.addEventListener('pycasa-image-uploaded', handleUpload);
+        return () => window.removeEventListener('pycasa-image-uploaded', handleUpload);
+    }, [loadTimeline]);
 
     // ── Derived state ────────────────────────────────────────────────────────
 

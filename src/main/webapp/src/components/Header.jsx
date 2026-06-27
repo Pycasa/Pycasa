@@ -98,6 +98,8 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
     const { scanStatus, unreadCount } = useNotifications();
     const { aiStatus } = useAIStatus();
     const { toast } = useToast();
+    const fileInputRef = useRef(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     // Get search param from URL
     const searchParams = new URLSearchParams(location.search);
@@ -126,19 +128,38 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
         }
     };
 
-    const handleTriggerScan = async () => {
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleUploadChange = async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        setIsUploading(true);
+        toast({
+            title: 'Uploading files...',
+            description: `Starting upload of ${files.length} images...`,
+        });
+
         try {
-            await api.images.triggerScan();
+            await api.images.upload(files);
             toast({
-                title: 'Scan initiated',
-                description: 'Checking configured directories for new photos...',
+                title: 'Upload successful',
+                description: `Successfully uploaded and indexed ${files.length} files.`,
             });
+            window.dispatchEvent(new CustomEvent('pycasa-image-uploaded'));
         } catch (error) {
             toast({
-                title: 'Scan failed',
-                variant: 'destructive',
+                title: 'Upload failed',
                 description: error.message,
+                variant: 'destructive',
             });
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         }
     };
 
@@ -146,31 +167,31 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
     const filesFound = scanStatus?.files_found || 0;
 
     return (
-        <header className="h-14 border-b border-white/[0.06] bg-black dark:bg-[#09090b] flex items-center justify-between px-5 z-20 shrink-0 select-none">
+        <header className="h-14 border-b border-slate-200 dark:border-white/[0.06] bg-white dark:bg-[#09090b] flex items-center justify-between px-5 z-20 shrink-0 select-none">
             {/* Left side: Hamburger (mobile) + Active Tab name */}
             <div className="flex items-center gap-3">
                 <button
                     onClick={onMenuClick}
-                    className="md:hidden flex items-center justify-center p-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors"
+                    className="md:hidden flex items-center justify-center p-2 rounded-lg text-slate-500 dark:text-white/40 hover:text-slate-800 dark:hover:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
                     aria-label="Toggle sidebar drawer"
                 >
                     <Menu className="w-5 h-5" />
                 </button>
             </div>
 
-            {/* Middle side: Central Search Bar (Immich style) */}
+            {/* Middle side: Central Search Bar (modern style) */}
             <div className="flex-1 max-w-2xl mx-4 sm:mx-8">
                 <div className="relative group">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-slate-600 dark:group-focus-within:text-slate-300 transition-colors" />
                     <input
                         type="text"
-                        placeholder="Search your photos..."
+                        placeholder="Search your photos"
                         value={searchValue}
                         onChange={handleSearchChange}
-                        className="w-full pl-10 pr-24 py-2 text-sm bg-white/[0.07] border border-white/10 rounded-full focus:outline-none focus:bg-white/[0.10] focus:border-white/20 focus:ring-2 focus:ring-white/10 transition-all text-white/90 placeholder-white/30 font-medium"
+                        className="w-full pl-10 pr-24 py-2 text-sm bg-slate-100 dark:bg-white/[0.07] border border-slate-200 dark:border-white/10 rounded-full focus:outline-none focus:bg-white focus:dark:bg-white/[0.10] focus:border-indigo-400 dark:focus:border-white/20 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-white/10 transition-all text-slate-800 dark:text-white/90 placeholder-slate-400 dark:placeholder-white/30 font-medium"
                     />
 
-                    {/* Inner badge & filter icon (Immich layout) */}
+                    {/* Inner badge & filter icon (modern layout) */}
                     <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2">
                         {searchValue ? (
                             <button
@@ -181,9 +202,6 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
                             </button>
                         ) : (
                             <>
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-700 px-2 py-0.5 rounded-md leading-none select-none hidden md:inline">
-                                    Context
-                                </span>
                                 <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400 cursor-pointer hover:text-slate-600 dark:hover:text-slate-300 hidden sm:inline" />
                             </>
                         )}
@@ -191,7 +209,7 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
                 </div>
             </div>
 
-            {/* Right side controls (Immich style) */}
+            {/* Right side controls (modern style) */}
             <div className="flex items-center gap-4 shrink-0">
                 {/* Scanning Pill */}
                 {isScanning && (
@@ -205,24 +223,37 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
 
                 {/* Upload/Scan Trigger Button */}
                 <button
-                    onClick={handleTriggerScan}
-                    disabled={isScanning}
-                    className="flex items-center gap-2 py-1.5 px-3.5 border border-white/15 bg-white/[0.07] text-white/80 text-xs font-semibold rounded-full hover:bg-white/[0.12] active:scale-95 transition-all shrink-0"
+                    onClick={handleUploadClick}
+                    disabled={isScanning || isUploading}
+                    className="flex items-center gap-2 py-1.5 px-3.5 border border-slate-200 dark:border-white/15 bg-white dark:bg-white/[0.07] text-slate-700 dark:text-white/80 text-xs font-semibold rounded-full hover:bg-slate-50 dark:hover:bg-white/[0.12] active:scale-95 transition-all shrink-0 disabled:opacity-50"
                 >
-                    <Upload className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Upload</span>
+                    {isUploading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+                    ) : (
+                        <Upload className="w-3.5 h-3.5 text-slate-500" />
+                    )}
+                    <span>{isUploading ? 'Uploading...' : 'Upload'}</span>
                 </button>
+
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleUploadChange}
+                    multiple
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                />
 
                 {/* Theme Toggle Button */}
                 <button
                     onClick={toggleTheme}
-                    className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white/90 transition-all shrink-0"
+                    className="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all shrink-0"
                     title="Toggle theme"
                 >
                     {theme === 'dark' ? (
-                        <Sun className="w-4.5 h-4.5" />
+                        <Sun className="w-[18px] h-[18px]" />
                     ) : (
-                        <Moon className="w-4.5 h-4.5" />
+                        <Moon className="w-[18px] h-[18px]" />
                     )}
                 </button>
 
@@ -236,7 +267,7 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
                     }`}
                     title="Notifications"
                 >
-                    <Bell className="w-4.5 h-4.5" />
+                    <Bell className="w-[18px] h-[18px]" />
                     {unreadCount > 0 && (
                         <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 shadow" />
                     )}

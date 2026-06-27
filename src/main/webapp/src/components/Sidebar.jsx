@@ -16,6 +16,7 @@ import {
     Archive,
     Trash2,
     Lock,
+    MapPin,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -69,15 +70,16 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
         { id: 'gallery', label: 'Gallery', icon: ImageIcon, path: '/gallery' },
     ];
 
-    // Library Section items (matches Immich)
+    // Library Section items (matches modern)
     const libraryNavItems = [
         { id: 'favorites', label: 'Favorites', icon: Heart, path: '/favorites' },
+        { id: 'places', label: 'Places', icon: MapPin, path: '/places' },
         { id: 'trash', label: 'Trash', icon: Trash2, path: '/trash' },
     ];
 
     return (
         <aside
-            className={`relative h-screen flex flex-col justify-between transition-all duration-300 z-30 shrink-0 bg-black dark:bg-[#09090b] border-r border-white/[0.06] ${
+            className={`relative h-screen flex flex-col justify-between transition-all duration-300 z-30 shrink-0 bg-slate-50 dark:bg-[#09090b] border-r border-slate-200 dark:border-white/[0.06] ${
                 isCollapsed ? 'w-20' : 'w-56'
             }`}
         >
@@ -96,7 +98,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                             }}
                         />
                         {!isCollapsed && (
-                            <span className="text-[15px] font-semibold tracking-tight text-white/90">
+                            <span className="text-[15px] font-semibold tracking-tight text-slate-800 dark:text-white/90">
                                 Pycasa
                             </span>
                         )}
@@ -104,7 +106,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
 
                     <button
                         onClick={() => setIsCollapsed(!isCollapsed)}
-                        className="hidden md:flex items-center justify-center w-5 h-5 rounded-full border border-white/10 hover:bg-white/10 text-white/30 hover:text-white/70 transition-colors"
+                        className="hidden md:flex items-center justify-center w-5 h-5 rounded-full border border-slate-200 dark:border-white/10 hover:bg-slate-200/50 dark:hover:bg-white/10 text-slate-400 dark:text-white/30 hover:text-slate-600 dark:hover:text-white/70 transition-colors"
                     >
                         {isCollapsed ? (
                             <ChevronRight className="w-3 h-3" />
@@ -128,12 +130,12 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                                 }}
                                 className={`w-full flex items-center gap-3 py-2 px-3 rounded-xl text-[14px] font-medium transition-all duration-150 ${
                                     isActive
-                                        ? 'bg-white/10 text-white'
-                                        : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
+                                        ? 'bg-slate-200/60 text-slate-900 dark:bg-white/10 dark:text-white'
+                                        : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/[0.06]'
                                 }`}
                             >
                                 <Icon
-                                    className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-white' : 'text-white/50'}`}
+                                    className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
                                 />
                                 {!isCollapsed && <span className="truncate">{item.label}</span>}
                             </button>
@@ -157,10 +159,10 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                     })}
                 </nav>
 
-                {/* Section 2: Library Header & Items (Immich styling) */}
+                {/* Section 2: Library Header & Items (modern styling) */}
                 <div className="px-3 py-1">
                     {!isCollapsed && (
-                        <p className="text-[11px] font-medium text-white/30 px-3 py-1.5 select-none">
+                        <p className="text-[11px] font-medium text-slate-400 dark:text-white/30 px-3 py-1.5 select-none">
                             Library
                         </p>
                     )}
@@ -177,12 +179,12 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                                     }}
                                     className={`w-full flex items-center gap-3 py-2 px-3 rounded-xl text-[14px] font-medium transition-all duration-150 ${
                                         isActive
-                                            ? 'bg-white/10 text-white'
-                                            : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
+                                            ? 'bg-slate-200/60 text-slate-900 dark:bg-white/10 dark:text-white'
+                                            : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/[0.06]'
                                     }`}
                                 >
                                     <Icon
-                                        className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-white' : 'text-white/50'}`}
+                                        className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
                                     />
                                     {!isCollapsed && <span className="truncate">{item.label}</span>}
                                 </button>
@@ -209,7 +211,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
             </div>
 
             {/* Sidebar Bottom Section: Settings + Storage & Version */}
-            <div className="p-3 border-t border-white/[0.06] space-y-2 shrink-0">
+            <div className="p-3 border-t border-slate-200 dark:border-white/[0.06] space-y-2 shrink-0">
                 {/* Settings nav button */}
                 {(() => {
                     const isActive = activeTab === 'settings';
@@ -221,12 +223,12 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                             }}
                             className={`w-full flex items-center gap-3 py-2 px-3 rounded-xl text-[14px] font-medium transition-all duration-150 ${
                                 isActive
-                                    ? 'bg-white/10 text-white'
-                                    : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
+                                    ? 'bg-slate-200/60 text-slate-900 dark:bg-white/10 dark:text-white'
+                                    : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/[0.06]'
                             }`}
                         >
                             <Settings
-                                className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-white' : 'text-white/50'}`}
+                                className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
                             />
                             {!isCollapsed && <span className="truncate">Settings</span>}
                         </button>
@@ -247,19 +249,19 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                     return content;
                 })()}
 
-                {/* Storage Widget Card (Immich style) */}
+                {/* Storage Widget Card (modern style) */}
                 {!isCollapsed && (
-                    <div className="bg-white/[0.04] p-3 rounded-xl border border-white/[0.06]">
-                        <div className="flex justify-between items-center text-[10px] font-semibold text-white/40 mb-2">
+                    <div className="bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.06]">
+                        <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">
                             <span>Storage space</span>
                         </div>
-                        <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden mb-2">
+                        <div className="w-full bg-slate-200 dark:bg-white/10 h-1 rounded-full overflow-hidden mb-2">
                             <div
                                 className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
                                 style={{ width: `${dbSizePercent}%` }}
                             />
                         </div>
-                        <div className="text-[10px] text-white/30 font-medium flex justify-between">
+                        <div className="text-[10px] text-slate-400/80 dark:text-white/30 font-medium flex justify-between">
                             <span>{dbSizeStr} used</span>
                             <span>of 50 GB</span>
                         </div>
@@ -267,7 +269,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                 )}
 
                 {/* Server Online Status Info Bar */}
-                <div className="flex items-center justify-between text-[11px] font-medium text-white/30 px-1 select-none">
+                <div className="flex items-center justify-between text-[11px] font-medium text-slate-400/80 dark:text-white/30 px-1 select-none">
                     <div className="flex items-center gap-2">
                         <span className="relative flex h-1.5 w-1.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>

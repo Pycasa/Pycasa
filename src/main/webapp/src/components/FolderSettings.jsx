@@ -21,6 +21,7 @@ import {
     RefreshCw,
     ChevronDown,
     ChevronUp,
+    Upload,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Label } from '@/components/ui/label';
@@ -30,13 +31,13 @@ import { useTheme } from '@/context/ThemeContext';
 import { useNotifications } from '@/context/NotificationsContext';
 
 /* ─────────────────────────────────────────────
-   Shared dark-input textarea class (Immich-like)
+   Shared dark-input textarea class (modern-like)
 ───────────────────────────────────────────── */
 const textareaClass =
     'flex min-h-[100px] w-full rounded-md border border-white/10 dark:border-white/10 bg-slate-100 dark:bg-[#161b2e] px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 font-mono resize-none';
 
 /* ─────────────────────────────────────────────
-   Immich-style accordion section
+   modern-style accordion section
 ───────────────────────────────────────────── */
 const SettingsSection = ({
     icon: Icon,
@@ -128,7 +129,7 @@ const SettingsSection = ({
 };
 
 /* ─────────────────────────────────────────────
-   Immich-style field label (blue text)
+   modern-style field label (blue text)
 ───────────────────────────────────────────── */
 const FieldLabel = ({ children, required }) => (
     <label className="text-xs font-semibold text-primary flex items-center gap-0.5 mb-1">
@@ -138,7 +139,7 @@ const FieldLabel = ({ children, required }) => (
 );
 
 /* ─────────────────────────────────────────────
-   Immich-style help/info block
+   modern-style help/info block
 ───────────────────────────────────────────── */
 const HelpBlock = ({ children }) => (
     <div className="flex gap-2 rounded-xl bg-blue-950/20 dark:bg-blue-950/30 border border-blue-800/30 px-4 py-3 text-xs text-blue-300">
@@ -169,6 +170,7 @@ const FolderSettings = () => {
     const [openaiModel, setOpenaiModel] = useState('gpt-4-vision-preview');
     const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
     const [tagGenerationPrompt, setTagGenerationPrompt] = useState('');
+    const [ollamaTimeout, setOllamaTimeout] = useState(120);
     const [aiService, setAiService] = useState('ollama');
     const [embeddingModel, setEmbeddingModel] = useState('nomic-embed-text');
     const [aiSettingsSaved, setAiSettingsSaved] = useState(false);
@@ -184,6 +186,12 @@ const FolderSettings = () => {
     const [jnaLibraryPath, setJnaLibraryPath] = useState('');
     const [ocrSaved, setOcrSaved] = useState(false);
     const [ocrSaving, setOcrSaving] = useState(false);
+
+    // Upload Settings State
+    const [uploadPath, setUploadPath] = useState('');
+    const [uploadSaved, setUploadSaved] = useState(false);
+    const [uploadSaving, setUploadSaving] = useState(false);
+    const [uploadPickerOpen, setUploadPickerOpen] = useState(false);
 
     const { toast } = useToast();
     const { theme } = useTheme();
@@ -261,8 +269,8 @@ const FolderSettings = () => {
 
     const fetchTrashPath = useCallback(async () => {
         try {
-            const path = await api.folders.getTrashPath?.();
-            if (path) setTrashPath(path);
+            const res = await api.folders.getTrashPath?.();
+            if (res && res.path) setTrashPath(res.path);
         } catch {
             /* swallow */
         }
@@ -310,6 +318,7 @@ const FolderSettings = () => {
                 if (cfg.openai_model) setOpenaiModel(cfg.openai_model);
                 if (cfg.ocr_tesseract_datapath) setTesseractDatapath(cfg.ocr_tesseract_datapath);
                 if (cfg.ocr_jna_library_path) setJnaLibraryPath(cfg.ocr_jna_library_path);
+                if (cfg.upload_path) setUploadPath(cfg.upload_path);
                 // Prompts: use saved value, fall back to shipped default
                 setImageAnalysisPrompt(
                     cfg.image_analysis_prompt || defaults?.image_analysis_prompt || ''
@@ -317,6 +326,9 @@ const FolderSettings = () => {
                 setTagGenerationPrompt(
                     cfg.tag_generation_prompt || defaults?.tag_generation_prompt || ''
                 );
+                if (cfg.ollama_timeout !== undefined && cfg.ollama_timeout !== null) {
+                    setOllamaTimeout(cfg.ollama_timeout);
+                }
             } catch {
                 /* swallow */
             }
@@ -439,6 +451,8 @@ const FolderSettings = () => {
                 openai_api_key: openaiApiKey,
                 openai_model: openaiModel,
                 image_analysis_prompt: imageAnalysisPrompt,
+                tag_generation_prompt: tagGenerationPrompt,
+                ollama_timeout: ollamaTimeout,
             });
             setAiSettingsSaved(true);
             toast({ title: 'AI settings saved' });
@@ -472,6 +486,38 @@ const FolderSettings = () => {
             });
         } finally {
             setOcrSaving(false);
+        }
+    };
+
+    const saveUploadSettings = async () => {
+        setUploadSaving(true);
+        try {
+            await api.settings.update({
+                upload_path: uploadPath,
+            });
+            setUploadSaved(true);
+            toast({ title: 'Upload settings saved' });
+            setTimeout(() => setUploadSaved(false), 3000);
+        } catch (error) {
+            toast({
+                title: 'Failed to save settings',
+                description: error.message,
+                variant: 'destructive',
+            });
+        } finally {
+            setUploadSaving(false);
+        }
+    };
+
+    const handleBrowseUploadPath = async () => {
+        try {
+            const res = await api.folders.browse();
+            if (res?.path) {
+                setUploadPath(res.path);
+            }
+        } catch (err) {
+            console.warn('Native browse failed, falling back to in-app picker:', err);
+            setUploadPickerOpen(true);
         }
     };
 
@@ -673,6 +719,46 @@ const FolderSettings = () => {
                     )}
                 </SettingsSection>
 
+                {/* ── Upload Location ─────────────────────────── */}
+                <SettingsSection
+                    icon={Upload}
+                    iconBg="bg-green-500/10"
+                    iconColor="text-green-400"
+                    title="Upload Location"
+                    description="Configure where files uploaded via Pycasa are stored."
+                    onSave={saveUploadSettings}
+                    saving={uploadSaving}
+                    saved={uploadSaved}
+                    saveLabel="Save Upload Settings"
+                >
+                    <div className="space-y-4">
+                        <div>
+                            <FieldLabel>Upload Path</FieldLabel>
+                            <div className="flex gap-2">
+                                <Input
+                                    value={uploadPath}
+                                    onChange={(e) => setUploadPath(e.target.value)}
+                                    placeholder="/path/to/uploads"
+                                    className={`${inputClass} font-mono text-xs flex-1`}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleBrowseUploadPath}
+                                    className="rounded-lg text-xs h-10 px-4"
+                                >
+                                    Browse...
+                                </Button>
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                                Default: ~/.pycasa/uploads (automatically created if it doesn't
+                                exist).
+                            </p>
+                        </div>
+                    </div>
+                </SettingsSection>
+
                 {/* ── AI Settings ────────────────────────────── */}
                 <SettingsSection
                     icon={Bot}
@@ -858,6 +944,24 @@ const FolderSettings = () => {
                                 />
                                 <p className="text-[11px] text-slate-400 mt-1">
                                     Instructions for converting image descriptions into tags.
+                                </p>
+                            </div>
+
+                            <div>
+                                <FieldLabel>Model Timeout (seconds)</FieldLabel>
+                                <Input
+                                    type="number"
+                                    value={ollamaTimeout}
+                                    onChange={(e) =>
+                                        setOllamaTimeout(parseInt(e.target.value) || '')
+                                    }
+                                    className={inputClass}
+                                    min={1}
+                                    placeholder="120"
+                                />
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    Max time in seconds to wait for Ollama responses before timing
+                                    out.
                                 </p>
                             </div>
 
@@ -1070,6 +1174,12 @@ const FolderSettings = () => {
                 open={pickerOpen}
                 onOpenChange={setPickerOpen}
                 onSelect={handlePickerSelect}
+            />
+
+            <FolderPicker
+                open={uploadPickerOpen}
+                onOpenChange={setUploadPickerOpen}
+                onSelect={(path) => setUploadPath(path)}
             />
         </div>
     );

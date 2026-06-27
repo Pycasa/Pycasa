@@ -78,22 +78,26 @@ const TrashView = () => {
             return;
         }
 
-        const idx = imagesRef.current.findIndex((img) => img?.id === id);
+        const idx = images.findIndex((img) => img?.id === id);
         if (idx !== -1) {
             setSelectedImageIndex(idx);
             setDirectModalImage(null);
         } else {
-            api.images
-                .getMetadata(null, id)
-                .then((img) => {
-                    if (img) {
-                        setDirectModalImage(img);
-                        setSelectedImageIndex(null);
-                    }
-                })
-                .catch((err) => console.error('Error fetching photo details for modal:', err));
+            if (directModalImage && directModalImage.id === id) {
+                setSelectedImageIndex(null);
+            } else {
+                api.images
+                    .getMetadata(null, id)
+                    .then((img) => {
+                        if (img) {
+                            setDirectModalImage(img);
+                            setSelectedImageIndex(null);
+                        }
+                    })
+                    .catch((err) => console.error('Error fetching photo details for modal:', err));
+            }
         }
-    }, [id, images]);
+    }, [id, images, directModalImage]);
 
     const selectedImage =
         selectedImageIndex !== null ? images[selectedImageIndex] : directModalImage;

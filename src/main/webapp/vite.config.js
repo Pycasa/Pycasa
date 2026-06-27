@@ -244,14 +244,24 @@ export default defineConfig({
 		addTransformIndexHtml,
 	],
 	server: {
-		// Quinoa starts Vite on this port internally and proxies it through
-		// Quarkus (port 3000). You never open this port directly.
 		port: 4173,
-		// Allow Quarkus (localhost:3000) to proxy requests to this dev server
 		cors: true,
 		strictPort: true,
 		headers: {
 			'Cross-Origin-Embedder-Policy': 'unsafe-none',
+		},
+		hmr: {
+			clientPort: 4173,
+		},
+		proxy: {
+			'/api': {
+				target: 'http://localhost:3000',
+				changeOrigin: true,
+			},
+			'/ws': {
+				target: 'ws://localhost:3000',
+				ws: true,
+			},
 		},
 	},
 	resolve: {

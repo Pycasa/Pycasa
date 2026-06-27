@@ -92,6 +92,28 @@ export const NotificationsProvider = ({ children }) => {
             setScanStatus({ is_scanning: false, files_found: event.payload.total });
         } else if (event.type === 'scan:error') {
             setScanStatus({ is_scanning: false, files_found: 0 });
+        } else if (event.type === 'scan:folder:progress') {
+            // Per-folder progress → keep navbar pill active and show running total
+            setScanStatus((prev) => ({
+                is_scanning: true,
+                files_found: (prev.files_found || 0) + 1,
+            }));
+        } else if (
+            event.type === 'scan:folder:completed' ||
+            event.type === 'scan:folder:complete'
+        ) {
+            // When a folder scan finishes check if any are still running via liveProgress state
+            setScanStatus((prev) => ({
+                ...prev,
+                // We'll let the terminal clear happen when all folders done
+                files_found: prev.files_found || 0,
+            }));
+            // Dispatch a custom event so other components can react (e.g. refresh image list)
+            window.dispatchEvent(
+                new CustomEvent('pycasa-scan-completed', { detail: event.payload })
+            );
+        } else if (event.type === 'scan:folder:error' || event.type === 'scan:folder:cancelled') {
+            // No-op for scanStatus; handled below in liveProgress cleanup
         } else if (event.type === 'ai:started') {
             setAiStatus({
                 is_running: true,
@@ -146,9 +168,12 @@ export const NotificationsProvider = ({ children }) => {
             }
             // Clear per-folder scan progress when that folder's scan finishes/cancels/errors
             if (
-                ['scan:folder:completed', 'scan:folder:cancelled', 'scan:folder:error'].includes(
-                    event.type
-                )
+                [
+                    'scan:folder:completed',
+                    'scan:folder:complete',
+                    'scan:folder:cancelled',
+                    'scan:folder:error',
+                ].includes(event.type)
             ) {
                 const fid = event.payload?.folder_id;
                 if (fid) {
@@ -156,6 +181,13 @@ export const NotificationsProvider = ({ children }) => {
                         const n = { ...prev };
                         delete n[`scan:folder:progress:${fid}`];
                         delete n[`scan:cancelling:${fid}`];
+                        // If no more active folder progress entries remain, clear the navbar pill
+                        const hasActive = Object.keys(n).some((k) =>
+                            k.startsWith('scan:folder:progress:')
+                        );
+                        if (!hasActive) {
+                            setScanStatus({ is_scanning: false, files_found: 0 });
+                        }
                         return n;
                     });
                 }

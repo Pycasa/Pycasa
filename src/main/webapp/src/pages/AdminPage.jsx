@@ -10,6 +10,7 @@ import FolderSettings from '@/components/FolderSettings';
 import TimelineView from '@/components/TimelineView.jsx';
 import FavoritesView from '@/components/FavoritesView';
 import TrashView from '@/components/TrashView';
+import PlacesView from '@/components/PlacesView';
 import NotificationsPage from '@/pages/NotificationsPage';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -29,19 +30,21 @@ const AdminPage = () => {
           ? 'favorites'
           : location.pathname.startsWith('/trash')
             ? 'trash'
-            : location.pathname.startsWith('/settings')
-              ? 'settings'
-              : location.pathname.startsWith('/notifications')
-                ? 'notifications'
-                : location.pathname.startsWith('/photos')
-                  ? location.state?.background?.startsWith('/gallery')
-                      ? 'gallery'
-                      : location.state?.background?.startsWith('/favorites')
-                        ? 'favorites'
-                        : location.state?.background?.startsWith('/trash')
-                          ? 'trash'
-                          : 'timeline'
-                  : 'timeline';
+            : location.pathname.startsWith('/places')
+              ? 'places'
+              : location.pathname.startsWith('/settings')
+                ? 'settings'
+                : location.pathname.startsWith('/notifications')
+                  ? 'notifications'
+                  : location.pathname.startsWith('/photos')
+                    ? location.state?.background?.startsWith('/gallery')
+                        ? 'gallery'
+                        : location.state?.background?.startsWith('/favorites')
+                          ? 'favorites'
+                          : location.state?.background?.startsWith('/trash')
+                            ? 'trash'
+                            : 'timeline'
+                    : 'timeline';
 
     const { toast } = useToast();
 
@@ -148,6 +151,7 @@ const AdminPage = () => {
                         {activeTab === 'timeline' && <TimelineView />}
                         {activeTab === 'favorites' && <FavoritesView />}
                         {activeTab === 'trash' && <TrashView />}
+                        {activeTab === 'places' && <PlacesView />}
                         {activeTab === 'settings' && <FolderSettings />}
                         {activeTab === 'notifications' && <NotificationsPage />}
                     </div>

@@ -21,13 +21,17 @@ import {
     Folder as FolderIcon,
     Loader2,
     ArrowLeft,
+    Camera,
+    Aperture,
+    MapPin,
 } from 'lucide-react';
+import { Map, Marker } from 'pigeon-maps';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 import { formatFileSize } from '@/lib/utils';
 import { useAIStatus } from '@/context/AIStatusContext';
 
-/* ─── Toolbar icon button — matches Immich's ActionButton style ────── */
+/* ─── Toolbar icon button — matches modern's ActionButton style ────── */
 const ToolBtn = ({ icon: Icon, label, onClick, active, danger, disabled, className = '' }) => (
     <button
         title={label}
@@ -48,10 +52,10 @@ const ToolBtn = ({ icon: Icon, label, onClick, active, danger, disabled, classNa
     </button>
 );
 
-/* ─── Detail row — icon (24px) + text block, exact Immich DetailPanel rows ── */
+/* ─── Detail row — icon (24px) + text block, exact modern DetailPanel rows ── */
 const DetailRow = ({ icon: Icon, primary, secondary, action, onClick }) => (
     <div
-        className={`flex gap-4 py-4 ${onClick ? 'cursor-pointer hover:text-immich-primary w-full place-items-start justify-between text-start' : ''}`}
+        className={`flex gap-4 py-4 ${onClick ? 'cursor-pointer hover:text-modern-primary w-full place-items-start justify-between text-start' : ''}`}
         onClick={onClick}
     >
         <div className="shrink-0">
@@ -73,7 +77,7 @@ const DetailRow = ({ icon: Icon, primary, secondary, action, onClick }) => (
     </div>
 );
 
-/* ─── Section header row — matches Immich's "flex h-10 items-center" label ── */
+/* ─── Section header row — matches modern's "flex h-10 items-center" label ── */
 const SectionHeader = ({ children, action }) => (
     <div className="flex h-10 w-full items-center justify-between text-sm">
         <p className="text-sm text-gray-500 dark:text-gray-300">{children}</p>
@@ -102,7 +106,7 @@ const ImageDetailModal = ({
     const [isAnalysing, setIsAnalysing] = useState(false);
     const [isRunningOCR, setIsRunningOCR] = useState(false);
     const [embeddings, setEmbeddings] = useState(null);
-    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const [details, setDetails] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
     const [isFavourite, setIsFavourite] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
@@ -114,6 +118,7 @@ const ImageDetailModal = ({
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
     const imageContainerRef = useRef(null);
+    const imgRef = useRef(null);
     const { toast } = useToast();
 
     const isBeingAnalyzed = aiStatus?.is_running && aiStatus.current_file === image?.full_path;
@@ -143,14 +148,21 @@ const ImageDetailModal = ({
         setIsFavourite(image.favorite || false);
         resetZoom();
         setImgLoaded(false);
-        setDimensions({ width: 0, height: 0 });
+        setDetails(null);
         if (isOpen) {
             api.images
                 .getDetails(image.full_path)
-                .then(setDimensions)
+                .then(setDetails)
                 .catch(() => {});
         }
     }, [image?.id, image?.full_path, isOpen]);
+
+    // Handle browser cached images where onLoad might not fire
+    useEffect(() => {
+        if (isOpen && imgRef.current && imgRef.current.complete) {
+            setImgLoaded(true);
+        }
+    }, [image?.full_path, isOpen]);
 
     // Keyboard navigation
     useEffect(() => {
@@ -362,39 +374,86 @@ const ImageDetailModal = ({
         [isDragging, scale, dragStart]
     );
     const onMouseUp = useCallback(() => setIsDragging(false), []);
-    const onWheel = useCallback(
-        (e) => {
+
+    // Set up non-passive wheel listener on container to allow preventDefault for zooming
+    useEffect(() => {
+        const container = imageContainerRef.current;
+        if (!container) return;
+
+        const handleWheel = (e) => {
             e.preventDefault();
-            e.deltaY < 0 ? handleZoomIn() : handleZoomOut();
-        },
-        [handleZoomIn, handleZoomOut]
-    );
+            if (e.deltaY < 0) {
+                handleZoomIn();
+            } else {
+                handleZoomOut();
+            }
+        };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+        return () => {
+            container.removeEventListener('wheel', handleWheel);
+        };
+    }, [isOpen, image, handleZoomIn, handleZoomOut]);
 
     if (!isOpen || !image) return null;
 
     // ── Derived display values ─────────────────────────────────────────
 
-    const modDate = image.modified ? new Date(image.modified) : null;
-    const dateStr = modDate
-        ? modDate.toLocaleDateString(undefined, {
-              weekday: 'short',
+    // Helpers to parse and format dates
+    const parseExifDate = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+            const standardStr = dateStr.replace(/:/g, (match, offset) => {
+                if (offset < 10) return '-';
+                return match;
+            });
+            const d = new Date(standardStr);
+            if (!isNaN(d.getTime())) return d;
+        } catch (e) {
+            // ignore
+        }
+        return null;
+    };
+
+    const formatTimeWithTz = (date) => {
+        if (!date) return '';
+        const time = date.toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+        });
+        const offsetMinutes = -date.getTimezoneOffset();
+        const sign = offsetMinutes >= 0 ? '+' : '-';
+        const absMinutes = Math.abs(offsetMinutes);
+        const hours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+        const minutes = String(absMinutes % 60).padStart(2, '0');
+        const offsetStr = `GMT${sign}${hours}:${minutes}`;
+        const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+        return `${weekday}, ${time} ${offsetStr}`;
+    };
+
+    let displayDate = null;
+    if (details?.date_taken) {
+        displayDate = parseExifDate(details.date_taken);
+    }
+    if (!displayDate && image.modified) {
+        displayDate = new Date(image.modified);
+    }
+
+    const dateStr = displayDate
+        ? displayDate.toLocaleDateString(undefined, {
               day: 'numeric',
               month: 'short',
               year: 'numeric',
           })
         : '';
-    const timeStr = modDate
-        ? modDate.toLocaleTimeString(undefined, {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-          })
-        : '';
-    const dimStr = dimensions.width > 0 ? `${dimensions.width} × ${dimensions.height}` : '';
-    const mpStr =
-        dimensions.width > 0
-            ? `${Math.round((dimensions.width * dimensions.height) / 1_000_000)} MP`
-            : '';
+    const timeStr = displayDate ? formatTimeWithTz(displayDate) : '';
+
+    const widthVal = details?.width || 0;
+    const heightVal = details?.height || 0;
+    const dimStr = widthVal > 0 ? `${widthVal} × ${heightVal}` : '';
+    const mpStr = widthVal > 0 ? `${Math.round((widthVal * heightVal) / 1_000_000)} MP` : '';
     const sizeStr = image.size ? formatFileSize(image.size) : '';
     const folderPath = image.full_path?.replace(/\/[^/]+$/, '') || '';
     const fileName = image.name || image.full_path?.split('/').pop() || '';
@@ -404,12 +463,12 @@ const ImageDetailModal = ({
             className="fixed inset-0 z-50 bg-black flex flex-col"
             style={{ fontFamily: 'inherit' }}
         >
-            {/* ── Top navbar — gradient fade like Immich ─────────────────── */}
+            {/* ── Top navbar — gradient fade like modern ─────────────────── */}
             <div className="shrink-0 flex items-center justify-between h-16 px-3 bg-gradient-to-b from-black/50 to-transparent relative z-10">
                 {/* Back arrow */}
                 <ToolBtn icon={ArrowLeft} label="Back" onClick={onClose} />
 
-                {/* Action icons — right side, matching Immich layout */}
+                {/* Action icons — right side, matching modern layout */}
                 <div className="flex items-center gap-0.5">
                     <ToolBtn icon={Share2} label="Share" onClick={() => {}} />
                     <ToolBtn icon={ZoomIn} label="Zoom in" onClick={handleZoomIn} />
@@ -478,7 +537,6 @@ const ImageDetailModal = ({
                     onMouseMove={onMouseMove}
                     onMouseUp={onMouseUp}
                     onMouseLeave={onMouseUp}
-                    onWheel={onWheel}
                     style={{ cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                 >
                     {/* Loading pulse */}
@@ -489,6 +547,7 @@ const ImageDetailModal = ({
                     )}
 
                     <img
+                        ref={imgRef}
                         key={image.full_path}
                         src={api.images.getRawUrl(image.full_path)}
                         alt={fileName}
@@ -563,10 +622,10 @@ const ImageDetailModal = ({
                     </div>
                 </div>
 
-                {/* ── Info panel — exact Immich DetailPanel structure ─────── */}
+                {/* ── Info panel — exact modern DetailPanel structure ─────── */}
                 {showInfo && (
                     <div className="w-[360px] shrink-0 bg-[#0a0a0a] dark:text-gray-200 flex flex-col overflow-hidden">
-                        {/* Header — "× Info" — Immich: p-2 + close round ghost + text-lg */}
+                        {/* Header — "× Info" — modern: p-2 + close round ghost + text-lg */}
                         <section className="relative p-2">
                             <div className="flex place-items-center gap-2">
                                 <button
@@ -644,7 +703,11 @@ const ImageDetailModal = ({
 
                             {/* Details section */}
                             <div className="px-4 mt-2">
-                                {dateStr || fileName || folderPath ? (
+                                {dateStr ||
+                                fileName ||
+                                folderPath ||
+                                details?.camera_model ||
+                                details?.latitude ? (
                                     <SectionHeader>Details</SectionHeader>
                                 ) : (
                                     <p className="text-sm text-gray-500 py-2">
@@ -681,6 +744,94 @@ const ImageDetailModal = ({
                                         }
                                     />
                                 )}
+
+                                {(details?.camera_make || details?.camera_model) && (
+                                    <DetailRow
+                                        icon={Camera}
+                                        primary={
+                                            details.camera_model
+                                                ? details.camera_model
+                                                      .toLowerCase()
+                                                      .startsWith(
+                                                          details.camera_make?.toLowerCase()
+                                                      )
+                                                    ? details.camera_model
+                                                    : `${details.camera_make} ${details.camera_model}`
+                                                : details.camera_make
+                                        }
+                                        secondary={[
+                                            details.shutter_speed,
+                                            details.iso ? `ISO ${details.iso}` : '',
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    />
+                                )}
+
+                                {(details?.lens_model ||
+                                    details?.aperture ||
+                                    details?.focal_length) && (
+                                    <DetailRow
+                                        icon={Aperture}
+                                        primary={details.lens_model || 'Lens'}
+                                        secondary={[details.aperture, details.focal_length]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    />
+                                )}
+
+                                {details?.location_name && (
+                                    <DetailRow
+                                        icon={MapPin}
+                                        primary={
+                                            <div className="space-y-0.5">
+                                                {details.location_name
+                                                    .split(',')
+                                                    .map((part, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            className="text-gray-200 text-sm"
+                                                        >
+                                                            {part.trim()}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        }
+                                    />
+                                )}
+
+                                {!details?.location_name &&
+                                    details?.latitude !== null &&
+                                    details?.longitude !== null &&
+                                    details?.latitude !== undefined && (
+                                        <DetailRow
+                                            icon={MapPin}
+                                            primary={`${details.latitude.toFixed(4)}, ${details.longitude.toFixed(4)}`}
+                                        />
+                                    )}
+
+                                {details?.latitude !== null &&
+                                    details?.longitude !== null &&
+                                    details?.latitude !== undefined &&
+                                    details?.longitude !== undefined && (
+                                        <div className="mt-4 rounded-xl overflow-hidden border border-white/10 h-48 relative">
+                                            <Map
+                                                height={192}
+                                                center={[details.latitude, details.longitude]}
+                                                zoom={15}
+                                                metaWheelZoom={true}
+                                                provider={(x, y, z) =>
+                                                    `https://a.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`
+                                                }
+                                            >
+                                                <Marker
+                                                    width={36}
+                                                    anchor={[details.latitude, details.longitude]}
+                                                    color="#3b82f6"
+                                                />
+                                            </Map>
+                                        </div>
+                                    )}
 
                                 {folderPath && <DetailRow icon={FolderIcon} primary={folderPath} />}
                             </div>

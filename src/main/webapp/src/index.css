@@ -27,7 +27,7 @@
     }
 
     .dark {
-        --background: 240 5% 6%; /* Near-black #0e0e10 — matches Immich */
+        --background: 240 5% 6%; /* Near-black #0e0e10 — matches modern */
         --foreground: 0 0% 95%;
         --card: 240 4% 8%; /* #121214 — slightly lighter than bg */
         --card-foreground: 0 0% 95%;
@@ -73,7 +73,7 @@
 
     .dark body,
     html.dark body {
-        background-color: #09090b; /* Immich near-black */
+        background-color: #09090b; /* modern near-black */
         color: #f1f1f3;
     }
 }
@@ -137,7 +137,7 @@
    throughout the app without needing to touch every JSX file.
    ============================================================ */
 
-/* Page backgrounds — Immich near-black palette */
+/* Page backgrounds — modern near-black palette */
 .dark .bg-white {
     background-color: #09090b !important;
 }
@@ -171,7 +171,7 @@
     background-color: rgba(9, 9, 11, 0.6) !important;
 }
 
-/* Text — match Immich's white-on-black contrast */
+/* Text — match modern's white-on-black contrast */
 .dark .text-gray-900 {
     color: #f1f1f3 !important;
 }
@@ -206,7 +206,7 @@
     color: #52525a !important;
 }
 
-/* Borders — very subtle, like Immich */
+/* Borders — very subtle, like modern */
 .dark .border-slate-100 {
     border-color: #1e1e20 !important;
 }
@@ -497,7 +497,7 @@
 }
 
 /* ============================================================
-   MODERN UI / IMMICH REDESIGN TRANSITIONS & UTILITIES
+   MODERN UI / modern REDESIGN TRANSITIONS & UTILITIES
    ============================================================ */
 
 @keyframes shimmer {
