@@ -2,7 +2,6 @@ package com.pycasa.resource;
 
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
-
 import java.util.Map;
 
 @Path("/api/health")

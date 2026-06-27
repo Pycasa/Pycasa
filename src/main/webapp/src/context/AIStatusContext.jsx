@@ -14,9 +14,5 @@ export const useAIStatus = () => {
 export const AIStatusProvider = ({ children }) => {
     const { aiStatus } = useNotifications();
 
-    return (
-        <AIStatusContext.Provider value={{ aiStatus }}>
-            {children}
-        </AIStatusContext.Provider>
-    );
+    return <AIStatusContext.Provider value={{ aiStatus }}>{children}</AIStatusContext.Provider>;
 };

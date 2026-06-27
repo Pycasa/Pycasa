@@ -12,6 +12,7 @@ public class AppSettings {
     public String openai_api_key;
     public String openai_model = "gpt-4-vision-preview";
     public String image_analysis_prompt;
+    public String tag_generation_prompt;
     public String ocr_tesseract_datapath;
     public String ocr_jna_library_path;
 

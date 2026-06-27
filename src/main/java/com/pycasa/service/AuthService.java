@@ -4,19 +4,17 @@ import com.pycasa.entity.User;
 import com.pycasa.repository.DatabaseRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
-
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jboss.logging.Logger;
 
 @ApplicationScoped
 public class AuthService {
 
     private static final Logger LOG = Logger.getLogger(AuthService.class);
 
-    @Inject
-    DatabaseRepository db;
+    @Inject DatabaseRepository db;
 
     // In-memory session store: token -> User
     private final Map<String, User> sessions = new ConcurrentHashMap<>();
@@ -29,7 +27,8 @@ public class AuthService {
         if (user == null) throw new SecurityException("Invalid credentials");
 
         String hash = DatabaseRepository.hashPassword(password);
-        LOG.debugf("Stored hash: %s, computed hash: %s, match: %s",
+        LOG.debugf(
+                "Stored hash: %s, computed hash: %s, match: %s",
                 user.passwordHash, hash, hash.equals(user.passwordHash));
         if (!hash.equals(user.passwordHash)) throw new SecurityException("Invalid credentials");
 

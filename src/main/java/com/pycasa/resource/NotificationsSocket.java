@@ -10,8 +10,7 @@ import jakarta.websocket.server.ServerEndpoint;
 @ApplicationScoped
 public class NotificationsSocket {
 
-    @Inject
-    NotificationService notificationService;
+    @Inject NotificationService notificationService;
 
     @OnOpen
     public void onOpen(Session session) {

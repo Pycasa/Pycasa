@@ -14,6 +14,8 @@ public class ImageRecord {
     public long created_at;
     public long indexed_at;
     public boolean ai_analysed;
+    public boolean favorite;
+    public boolean trashed;
     public String thumbnail_path;
     public String type = "image";
 

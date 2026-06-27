@@ -5,9 +5,8 @@ import com.pycasa.service.AuthService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
-import org.jboss.logging.Logger;
-
 import java.util.Map;
+import org.jboss.logging.Logger;
 
 @Path("/api/auth")
 @Produces(MediaType.APPLICATION_JSON)
@@ -16,8 +15,7 @@ public class AuthResource {
 
     private static final Logger LOG = Logger.getLogger(AuthResource.class);
 
-    @Inject
-    AuthService authService;
+    @Inject AuthService authService;
 
     public record LoginRequest(String username, String password) {}
 
@@ -26,18 +24,25 @@ public class AuthResource {
     public Response login(LoginRequest req) {
         try {
             AuthService.LoginResult result = authService.login(req.username(), req.password());
-            Map<String, Object> session = Map.of(
-                    "access_token", result.token(),
-                    "user", Map.of(
-                            "id", result.user().id,
-                            "name", result.user().name != null ? result.user().name : result.user().username,
-                            "email", result.user().email != null ? result.user().email : ""
-                    )
-            );
+            Map<String, Object> session =
+                    Map.of(
+                            "access_token", result.token(),
+                            "user",
+                                    Map.of(
+                                            "id", result.user().id,
+                                            "name",
+                                                    result.user().name != null
+                                                            ? result.user().name
+                                                            : result.user().username,
+                                            "email",
+                                                    result.user().email != null
+                                                            ? result.user().email
+                                                            : ""));
             return Response.ok(Map.of("session", session, "user", session.get("user"))).build();
         } catch (SecurityException e) {
             return Response.status(Response.Status.UNAUTHORIZED)
-                    .entity(Map.of("error", e.getMessage())).build();
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
         }
     }
 
@@ -56,16 +61,18 @@ public class AuthResource {
         User user = authService.validateToken(token);
         if (user == null) {
             return Response.status(Response.Status.UNAUTHORIZED)
-                    .entity(Map.of("error", "Invalid or expired session")).build();
+                    .entity(Map.of("error", "Invalid or expired session"))
+                    .build();
         }
-        Map<String, Object> session = Map.of(
-                "access_token", token,
-                "user", Map.of(
-                        "id", user.id,
-                        "name", user.name != null ? user.name : user.username,
-                        "email", user.email != null ? user.email : ""
-                )
-        );
+        Map<String, Object> session =
+                Map.of(
+                        "access_token",
+                        token,
+                        "user",
+                        Map.of(
+                                "id", user.id,
+                                "name", user.name != null ? user.name : user.username,
+                                "email", user.email != null ? user.email : ""));
         return Response.ok(Map.of("session", session)).build();
     }
 

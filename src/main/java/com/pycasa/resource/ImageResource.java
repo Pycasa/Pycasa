@@ -1,24 +1,23 @@
 package com.pycasa.resource;
 
 import com.pycasa.entity.ImageRecord;
+import com.pycasa.entity.MonitoredFolder;
 import com.pycasa.repository.DatabaseRepository;
 import com.pycasa.service.FolderScanService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
-
-import java.io.File;
-import java.io.ByteArrayOutputStream;
-import java.awt.image.BufferedImage;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
-import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.nio.file.Files;
 import java.util.*;
+import javax.imageio.ImageIO;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 
 @Path("/api/images")
 @Produces(MediaType.APPLICATION_JSON)
@@ -27,11 +26,9 @@ public class ImageResource {
 
     private static final Logger LOG = Logger.getLogger(ImageResource.class);
 
-    @Inject
-    DatabaseRepository db;
+    @Inject DatabaseRepository db;
 
-    @Inject
-    FolderScanService scanService;
+    @Inject FolderScanService scanService;
 
     @ConfigProperty(name = "couchbase.lite.database.directory")
     String dbDirectory;
@@ -50,18 +47,22 @@ public class ImageResource {
             @QueryParam("date_to") Long dateTo,
             @QueryParam("extensions") String extensions,
             @QueryParam("size_min") Long sizeMin,
-            @QueryParam("size_max") Long sizeMax) {
+            @QueryParam("size_max") Long sizeMax,
+            @QueryParam("favorite") Boolean favorite,
+            @QueryParam("trashed") @DefaultValue("false") Boolean trashed) {
 
-        List<String> tagList = (tags != null && !tags.isBlank())
-                ? Arrays.asList(tags.split(","))
-                : null;
+        List<String> tagList =
+                (tags != null && !tags.isBlank()) ? Arrays.asList(tags.split(",")) : null;
 
-        List<String> extList = (extensions != null && !extensions.isBlank())
-                ? Arrays.asList(extensions.split(","))
-                : null;
+        List<String> extList =
+                (extensions != null && !extensions.isBlank())
+                        ? Arrays.asList(extensions.split(","))
+                        : null;
 
-        List<ImageRecord> images = db.listImages(folderId, search, tagList, sortBy, sortOrder, page, limit,
-                dateFrom, dateTo, extList, sizeMin, sizeMax);
+        List<ImageRecord> images =
+                db.listImages(
+                        folderId, search, tagList, sortBy, sortOrder, page, limit, dateFrom, dateTo,
+                        extList, sizeMin, sizeMax, favorite, trashed);
         return Response.ok(images).build();
     }
 
@@ -69,6 +70,41 @@ public class ImageResource {
     @Path("/tags")
     public Response getTags() {
         return Response.ok(db.listAllTags()).build();
+    }
+
+    @GET
+    @Path("/favorites")
+    public Response listFavorites(
+            @QueryParam("page") @DefaultValue("1") int page,
+            @QueryParam("limit") @DefaultValue("50") int limit) {
+        List<ImageRecord> favorites =
+                db.listImages(
+                        null,
+                        null,
+                        null,
+                        "modified_at",
+                        "DESC",
+                        page,
+                        limit,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true);
+        return Response.ok(favorites).build();
+    }
+
+    @POST
+    @Path("/{id}/favorite")
+    public Response toggleFavorite(@PathParam("id") String id) {
+        ImageRecord updated = db.toggleFavorite(id);
+        if (updated == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Image not found"))
+                    .build();
+        }
+        return Response.ok(updated).build();
     }
 
     @GET
@@ -82,7 +118,8 @@ public class ImageResource {
         if (img == null && path != null) img = db.findImageByPath(path);
         if (img == null) {
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity(Map.of("error", "Image not found")).build();
+                    .entity(Map.of("error", "Image not found"))
+                    .build();
         }
         return Response.ok(img).build();
     }
@@ -92,12 +129,14 @@ public class ImageResource {
     public Response getDetails(@QueryParam("path") String path) {
         if (path == null) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(Map.of("error", "path is required")).build();
+                    .entity(Map.of("error", "path is required"))
+                    .build();
         }
         ImageRecord img = db.findImageByPath(path);
         if (img == null) {
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity(Map.of("error", "Image not found")).build();
+                    .entity(Map.of("error", "Image not found"))
+                    .build();
         }
 
         // Read actual pixel dimensions from the file
@@ -106,7 +145,7 @@ public class ImageResource {
             java.io.File file = new java.io.File(path);
             if (file.exists()) {
                 try (javax.imageio.stream.ImageInputStream iis =
-                             javax.imageio.ImageIO.createImageInputStream(file)) {
+                        javax.imageio.ImageIO.createImageInputStream(file)) {
                     if (iis != null) {
                         java.util.Iterator<javax.imageio.ImageReader> readers =
                                 javax.imageio.ImageIO.getImageReaders(iis);
@@ -153,7 +192,8 @@ public class ImageResource {
         if (img == null && path != null) img = db.findImageByPath(path);
         if (img == null) {
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity(Map.of("error", "Image not found")).build();
+                    .entity(Map.of("error", "Image not found"))
+                    .build();
         }
         if (data.containsKey("description")) img.description = (String) data.get("description");
         if (data.containsKey("tags")) {
@@ -164,54 +204,121 @@ public class ImageResource {
                 img.tags = tagList;
             }
         }
+        if (data.containsKey("favorite")) {
+            img.favorite = (Boolean) data.get("favorite");
+        }
         db.save(img.id, img);
         return Response.ok(img).build();
     }
 
     @DELETE
-    public Response deleteImage(@QueryParam("folder_id") String folderId,
-                                @QueryParam("path") String path) {
+    public Response deleteImage(
+            @QueryParam("folder_id") String folderId, @QueryParam("path") String path) {
         if (path == null) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(Map.of("error", "path is required")).build();
+                    .entity(Map.of("error", "path is required"))
+                    .build();
         }
         ImageRecord img = db.findImageByPath(path);
         if (img == null) {
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity(Map.of("error", "Image not found")).build();
+                    .entity(Map.of("error", "Image not found"))
+                    .build();
         }
 
-        // Move to trash instead of deleting
-        try {
-            String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
-            File trashDir = new File(dir + File.separator + "trash");
-            trashDir.mkdirs();
-            File src = new File(path);
-            File dest = new File(trashDir, src.getName());
-            // Avoid overwriting existing trash files
-            if (dest.exists()) {
-                dest = new File(trashDir, System.currentTimeMillis() + "_" + src.getName());
+        if (img.trashed) {
+            // Permanent delete from disk and database
+            try {
+                File file = new File(img.file_path);
+                if (file.exists() && file.isFile()) {
+                    file.delete();
+                }
+                if (img.thumbnail_path != null) {
+                    File thumb = new File(img.thumbnail_path);
+                    if (thumb.exists() && thumb.isFile()) {
+                        thumb.delete();
+                    }
+                }
+            } catch (Exception e) {
+                LOG.warnf("Could not permanently delete file: %s", e.getMessage());
             }
-            Files.move(src.toPath(), dest.toPath());
-        } catch (Exception e) {
-            LOG.warnf("Could not move image to trash: %s", e.getMessage());
+            db.delete(img.id);
+            return Response.ok(Map.of("message", "Image permanently deleted")).build();
+        } else {
+            // Soft delete: Move to trash folder
+            String newPath = path;
+            try {
+                String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
+                File trashDir = new File(dir + File.separator + "trash");
+                trashDir.mkdirs();
+                File src = new File(path);
+                File dest = new File(trashDir, src.getName());
+                if (dest.exists()) {
+                    dest = new File(trashDir, System.currentTimeMillis() + "_" + src.getName());
+                }
+                Files.move(src.toPath(), dest.toPath());
+                newPath = dest.getAbsolutePath();
+            } catch (Exception e) {
+                LOG.warnf("Could not move image to trash: %s", e.getMessage());
+            }
+
+            img.file_path = newPath;
+            img.trashed = true;
+            img.favorite = false;
+            db.save(img.id, img);
+            return Response.ok(Map.of("message", "Image moved to trash")).build();
+        }
+    }
+
+    @POST
+    @Path("/{id}/restore")
+    public Response restoreImage(@PathParam("id") String id) {
+        ImageRecord img = db.findImageById(id);
+        if (img == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Image not found"))
+                    .build();
+        }
+        if (!img.trashed) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Image is not in trash"))
+                    .build();
         }
 
-        db.delete(img.id);
-        return Response.ok(Map.of("message", "Image deleted")).build();
+        String newPath = img.file_path;
+        MonitoredFolder folder = db.findFolderById(img.folder_id);
+        if (folder != null) {
+            try {
+                File src = new File(img.file_path);
+                File destDir = new File(folder.path);
+                destDir.mkdirs();
+                String name = src.getName().replaceFirst("^\\d+_", "");
+                File dest = new File(destDir, name);
+                Files.move(src.toPath(), dest.toPath());
+                newPath = dest.getAbsolutePath();
+            } catch (Exception e) {
+                LOG.warnf("Could not restore image: %s", e.getMessage());
+            }
+        }
+
+        img.file_path = newPath;
+        img.trashed = false;
+        db.save(img.id, img);
+        return Response.ok(img).build();
     }
 
     @GET
     @Path("/scan-status")
     public Response getScanStatus() {
         FolderScanService.ScanStatus status = scanService.getScanStatus();
-        return Response.ok(Map.of(
-                "running", status.running(),
-                "is_scanning", status.running(),
-                "scanned", status.scanned(),
-                "total", status.total(),
-                "files_found", status.scanned()
-        )).build();
+        return Response.ok(
+                        Map.of(
+                                "running", status.running(),
+                                "is_scanning", status.running(),
+                                "scanned", status.scanned(),
+                                "total", status.total(),
+                                "files_found", status.scanned()))
+                .build();
     }
 
     @POST
@@ -235,13 +342,12 @@ public class ImageResource {
         try {
             String mimeType = Files.probeContentType(file.toPath());
             if (mimeType == null) mimeType = "application/octet-stream";
-            return Response.ok(file, mimeType)
-                    .header("Cache-Control", "max-age=86400")
-                    .build();
+            return Response.ok(file, mimeType).header("Cache-Control", "max-age=86400").build();
         } catch (Exception e) {
             return Response.serverError().build();
         }
     }
+
     @GET
     @Path("/thumbnail")
     @Produces("image/jpeg")
@@ -266,7 +372,8 @@ public class ImageResource {
                 String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
                 File thumbDir = new File(dir, "thumbs");
                 thumbDir.mkdirs();
-                String thumbName = (imgRecord != null ? imgRecord.id : src.getName()) + "_thumb.jpg";
+                String thumbName =
+                        (imgRecord != null ? imgRecord.id : src.getName()) + "_thumb.jpg";
                 thumbFile = new File(thumbDir, thumbName);
 
                 if (!thumbFile.exists()) {
@@ -279,10 +386,15 @@ public class ImageResource {
                                 .toFile(thumbFile);
                     } catch (Exception decodeEx) {
                         // Format not supported by ImageIO (e.g. HEIC) — generate a placeholder
-                        LOG.debugf("Cannot decode %s for thumbnail (%s), generating placeholder", path, decodeEx.getMessage());
-                        String ext = src.getName().contains(".")
-                                ? src.getName().substring(src.getName().lastIndexOf('.') + 1).toUpperCase()
-                                : "IMG";
+                        LOG.debugf(
+                                "Cannot decode %s for thumbnail (%s), generating placeholder",
+                                path, decodeEx.getMessage());
+                        String ext =
+                                src.getName().contains(".")
+                                        ? src.getName()
+                                                .substring(src.getName().lastIndexOf('.') + 1)
+                                                .toUpperCase()
+                                        : "IMG";
                         generatePlaceholderThumbnail(thumbFile, ext);
                     }
                 }
@@ -305,15 +417,16 @@ public class ImageResource {
     }
 
     /**
-     * Generates a 300x300 grey placeholder JPEG with the file extension label centred on it.
-     * Used for formats that Java ImageIO cannot decode (e.g. HEIC, AVIF).
+     * Generates a 300x300 grey placeholder JPEG with the file extension label centred on it. Used
+     * for formats that Java ImageIO cannot decode (e.g. HEIC, AVIF).
      */
     private void generatePlaceholderThumbnail(File dest, String label) throws Exception {
         int size = 300;
         BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g.setRenderingHint(
+                RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
         // Background
         g.setColor(new Color(30, 35, 46));
@@ -343,4 +456,4 @@ public class ImageResource {
         g.dispose();
         ImageIO.write(img, "jpg", dest);
     }
-    }
+}

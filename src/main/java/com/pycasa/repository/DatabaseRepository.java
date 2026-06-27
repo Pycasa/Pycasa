@@ -5,13 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pycasa.entity.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.jboss.logging.Logger;
-
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 
 @ApplicationScoped
 public class DatabaseRepository {
@@ -28,31 +27,32 @@ public class DatabaseRepository {
     private com.couchbase.lite.Collection defaultCollection;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    // All image/folder/settings fields we select explicitly
     private static final SelectResult[] IMAGE_FIELDS = {
-            SelectResult.expression(Meta.id),
-            SelectResult.property("id"),
-            SelectResult.property("file_path"),
-            SelectResult.property("folder_id"),
-            SelectResult.property("description"),
-            SelectResult.property("tags"),
-            SelectResult.property("ocr_text"),
-            SelectResult.property("file_size"),
-            SelectResult.property("modified_at"),
-            SelectResult.property("created_at"),
-            SelectResult.property("indexed_at"),
-            SelectResult.property("ai_analysed"),
-            SelectResult.property("thumbnail_path"),
-            SelectResult.property("type"),
+        SelectResult.expression(Meta.id),
+        SelectResult.property("id"),
+        SelectResult.property("file_path"),
+        SelectResult.property("folder_id"),
+        SelectResult.property("description"),
+        SelectResult.property("tags"),
+        SelectResult.property("ocr_text"),
+        SelectResult.property("file_size"),
+        SelectResult.property("modified_at"),
+        SelectResult.property("created_at"),
+        SelectResult.property("indexed_at"),
+        SelectResult.property("ai_analysed"),
+        SelectResult.property("thumbnail_path"),
+        SelectResult.property("favorite"),
+        SelectResult.property("trashed"),
+        SelectResult.property("type"),
     };
 
     private static final SelectResult[] FOLDER_FIELDS = {
-            SelectResult.expression(Meta.id),
-            SelectResult.property("id"),
-            SelectResult.property("path"),
-            SelectResult.property("label"),
-            SelectResult.property("type"),
-            SelectResult.property("createdAt"),
+        SelectResult.expression(Meta.id),
+        SelectResult.property("id"),
+        SelectResult.property("path"),
+        SelectResult.property("label"),
+        SelectResult.property("type"),
+        SelectResult.property("createdAt"),
     };
 
     @PostConstruct
@@ -60,15 +60,32 @@ public class DatabaseRepository {
         try {
             String dir = dbDirectory.replace("${user.home}", System.getProperty("user.home"));
             File dbDir = new File(dir);
+
+            // Handle migration if legacy directory exists and new directory does not
+            if (!dbDir.exists()) {
+                File legacyDbDir = new File(dbDir.getParentFile(), "couchbase");
+                if (legacyDbDir.exists() && legacyDbDir.isDirectory()) {
+                    LOG.info("Migrating legacy database directory from 'couchbase' to 'cache'...");
+                    boolean renamed = legacyDbDir.renameTo(dbDir);
+                    if (renamed) {
+                        LOG.info("Successfully migrated database directory to 'cache'");
+                    } else {
+                        LOG.warn(
+                                "Failed to migrate database directory from 'couchbase' to 'cache'");
+                    }
+                }
+            }
+
             dbDir.mkdirs();
-            
+
             // Create a dedicated scratch/temp directory for Couchbase Lite inside .pycasa
             File scratchDir = new File(dbDir.getParentFile(), "temp");
             scratchDir.mkdirs();
-            
-            // Initialize Couchbase Lite with explicit root and scratch paths (resolves UnsatisfiedLinkError and permissions issues)
+
+            // Initialize Couchbase Lite with explicit root and scratch paths (resolves
+            // UnsatisfiedLinkError and permissions issues)
             CouchbaseLite.init(false, dbDir, scratchDir);
-            
+
             DatabaseConfiguration config = new DatabaseConfiguration();
             config.setDirectory(dir);
             database = new Database(dbName, config);
@@ -84,23 +101,34 @@ public class DatabaseRepository {
 
     private void ensureIndexes() {
         try {
-            // Index 1: type + modified_at (DESC) — used by timeline date-count query and main listImages sort
-            ValueIndexConfiguration idxTypeModified = new ValueIndexConfiguration(new String[]{"type", "modified_at"});
+            // Index 1: type + modified_at (DESC) — used by timeline date-count query and main
+            // listImages sort
+            ValueIndexConfiguration idxTypeModified =
+                    new ValueIndexConfiguration(new String[] {"type", "modified_at"});
             defaultCollection.createIndex("idx_type_modified_at", idxTypeModified);
 
             // Index 2: type + folder_id + modified_at — used by folder-filtered listImages
-            ValueIndexConfiguration idxTypeFolderModified = new ValueIndexConfiguration(new String[]{"type", "folder_id", "modified_at"});
+            ValueIndexConfiguration idxTypeFolderModified =
+                    new ValueIndexConfiguration(new String[] {"type", "folder_id", "modified_at"});
             defaultCollection.createIndex("idx_type_folder_modified_at", idxTypeFolderModified);
 
             // Index 3: type + file_path — used by findImageByPath
-            ValueIndexConfiguration idxTypeFilePath = new ValueIndexConfiguration(new String[]{"type", "file_path"});
+            ValueIndexConfiguration idxTypeFilePath =
+                    new ValueIndexConfiguration(new String[] {"type", "file_path"});
             defaultCollection.createIndex("idx_type_file_path", idxTypeFilePath);
 
             // Index 4: type + created_at — used when listImages sorts by created_at
-            ValueIndexConfiguration idxTypeCreated = new ValueIndexConfiguration(new String[]{"type", "created_at"});
+            ValueIndexConfiguration idxTypeCreated =
+                    new ValueIndexConfiguration(new String[] {"type", "created_at"});
             defaultCollection.createIndex("idx_type_created_at", idxTypeCreated);
 
-            LOG.info("Couchbase Lite indexes ensured (type+modified_at, type+folder_id+modified_at, type+file_path, type+created_at)");
+            // Index 5: type + favorite + modified_at — used for fast favorites queries
+            ValueIndexConfiguration idxTypeFavoriteModified =
+                    new ValueIndexConfiguration(new String[] {"type", "favorite", "modified_at"});
+            defaultCollection.createIndex("idx_type_favorite_modified_at", idxTypeFavoriteModified);
+
+            LOG.info(
+                    "Couchbase Lite indexes ensured (type+modified_at, type+folder_id+modified_at, type+file_path, type+created_at, type+favorite+modified_at)");
         } catch (Exception e) {
             LOG.warnf("Could not create indexes: %s", e.getMessage());
         }
@@ -110,18 +138,24 @@ public class DatabaseRepository {
     // Low-level helpers
     // -------------------------------------------------------------------------
 
+    private Expression notTrashed() {
+        return Expression.property("trashed")
+                .equalTo(Expression.booleanValue(false))
+                .or(Expression.property("trashed").isNotValued());
+    }
+
     private MutableDocument toDoc(String id, Object entity) throws Exception {
         @SuppressWarnings("unchecked")
         Map<String, Object> map = mapper.convertValue(entity, Map.class);
         MutableDocument doc = new MutableDocument(id);
         for (Map.Entry<String, Object> e : map.entrySet()) {
             if (e.getValue() == null) continue;
-            if (e.getValue() instanceof String s)        doc.setString(e.getKey(), s);
-            else if (e.getValue() instanceof Integer i)  doc.setInt(e.getKey(), i);
-            else if (e.getValue() instanceof Long l)     doc.setLong(e.getKey(), l);
-            else if (e.getValue() instanceof Boolean b)  doc.setBoolean(e.getKey(), b);
-            else if (e.getValue() instanceof Double d)   doc.setDouble(e.getKey(), d);
-            else                                         doc.setValue(e.getKey(), e.getValue());
+            if (e.getValue() instanceof String s) doc.setString(e.getKey(), s);
+            else if (e.getValue() instanceof Integer i) doc.setInt(e.getKey(), i);
+            else if (e.getValue() instanceof Long l) doc.setLong(e.getKey(), l);
+            else if (e.getValue() instanceof Boolean b) doc.setBoolean(e.getKey(), b);
+            else if (e.getValue() instanceof Double d) doc.setDouble(e.getKey(), d);
+            else doc.setValue(e.getKey(), e.getValue());
         }
         return doc;
     }
@@ -179,9 +213,10 @@ public class DatabaseRepository {
 
     private void ensureDefaultUser() {
         try {
-            Query q = QueryBuilder.select(SelectResult.expression(Meta.id))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("user")));
+            Query q =
+                    QueryBuilder.select(SelectResult.expression(Meta.id))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(Expression.property("type").equalTo(Expression.string("user")));
             ResultSet rs = q.execute();
             if (!rs.allResults().isEmpty()) return;
 
@@ -207,10 +242,15 @@ public class DatabaseRepository {
     public User findUserByUsername(String username) {
         try {
             // First find the doc ID by username
-            Query q = QueryBuilder.select(SelectResult.expression(Meta.id))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("user"))
-                            .and(Expression.property("username").equalTo(Expression.string(username))));
+            Query q =
+                    QueryBuilder.select(SelectResult.expression(Meta.id))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("user"))
+                                            .and(
+                                                    Expression.property("username")
+                                                            .equalTo(Expression.string(username))));
             ResultSet rs = q.execute();
             List<Result> results = rs.allResults();
             if (results.isEmpty()) return null;
@@ -241,9 +281,12 @@ public class DatabaseRepository {
 
     public List<MonitoredFolder> listFolders() {
         try {
-            Query q = QueryBuilder.select(FOLDER_FIELDS)
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("folder")));
+            Query q =
+                    QueryBuilder.select(FOLDER_FIELDS)
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("folder")));
             ResultSet rs = q.execute();
             List<MonitoredFolder> folders = new ArrayList<>();
             for (Result r : rs.allResults()) {
@@ -265,56 +308,170 @@ public class DatabaseRepository {
     // Image queries
     // -------------------------------------------------------------------------
 
-    public List<ImageRecord> listImages(String folderId, String search, List<String> tags,
-                                        String sortBy, String sortOrder, int page, int limit,
-                                        Long dateFrom, Long dateTo, List<String> extensions,
-                                        Long sizeMin, Long sizeMax) {
+    public List<ImageRecord> listImages(
+            String folderId,
+            String search,
+            List<String> tags,
+            String sortBy,
+            String sortOrder,
+            int page,
+            int limit,
+            Long dateFrom,
+            Long dateTo,
+            List<String> extensions,
+            Long sizeMin,
+            Long sizeMax) {
+        return listImages(
+                folderId,
+                search,
+                tags,
+                sortBy,
+                sortOrder,
+                page,
+                limit,
+                dateFrom,
+                dateTo,
+                extensions,
+                sizeMin,
+                sizeMax,
+                null,
+                false);
+    }
+
+    public List<ImageRecord> listImages(
+            String folderId,
+            String search,
+            List<String> tags,
+            String sortBy,
+            String sortOrder,
+            int page,
+            int limit,
+            Long dateFrom,
+            Long dateTo,
+            List<String> extensions,
+            Long sizeMin,
+            Long sizeMax,
+            Boolean favorite) {
+        return listImages(
+                folderId,
+                search,
+                tags,
+                sortBy,
+                sortOrder,
+                page,
+                limit,
+                dateFrom,
+                dateTo,
+                extensions,
+                sizeMin,
+                sizeMax,
+                favorite,
+                false);
+    }
+
+    public List<ImageRecord> listImages(
+            String folderId,
+            String search,
+            List<String> tags,
+            String sortBy,
+            String sortOrder,
+            int page,
+            int limit,
+            Long dateFrom,
+            Long dateTo,
+            List<String> extensions,
+            Long sizeMin,
+            Long sizeMax,
+            Boolean favorite,
+            Boolean trashed) {
         try {
             Expression where = Expression.property("type").equalTo(Expression.string("image"));
             if (folderId != null && !folderId.isBlank()) {
-                where = where.and(Expression.property("folder_id").equalTo(Expression.string(folderId)));
+                where =
+                        where.and(
+                                Expression.property("folder_id")
+                                        .equalTo(Expression.string(folderId)));
             }
             if (search != null && !search.isBlank()) {
                 String lc = "%" + search.toLowerCase() + "%";
-                where = where.and(
-                        Expression.property("file_path").like(Expression.string(lc))
-                                .or(Expression.property("description").like(Expression.string(lc)))
-                );
+                where =
+                        where.and(
+                                Expression.property("file_path")
+                                        .like(Expression.string(lc))
+                                        .or(
+                                                Expression.property("description")
+                                                        .like(Expression.string(lc))));
             }
             if (dateFrom != null) {
-                where = where.and(Expression.property("modified_at").greaterThanOrEqualTo(Expression.longValue(dateFrom)));
+                where =
+                        where.and(
+                                Expression.property("modified_at")
+                                        .greaterThanOrEqualTo(Expression.longValue(dateFrom)));
             }
             if (dateTo != null) {
-                where = where.and(Expression.property("modified_at").lessThanOrEqualTo(Expression.longValue(dateTo)));
+                where =
+                        where.and(
+                                Expression.property("modified_at")
+                                        .lessThanOrEqualTo(Expression.longValue(dateTo)));
             }
             if (sizeMin != null) {
-                where = where.and(Expression.property("file_size").greaterThanOrEqualTo(Expression.longValue(sizeMin)));
+                where =
+                        where.and(
+                                Expression.property("file_size")
+                                        .greaterThanOrEqualTo(Expression.longValue(sizeMin)));
             }
             if (sizeMax != null) {
-                where = where.and(Expression.property("file_size").lessThanOrEqualTo(Expression.longValue(sizeMax)));
+                where =
+                        where.and(
+                                Expression.property("file_size")
+                                        .lessThanOrEqualTo(Expression.longValue(sizeMax)));
+            }
+            if (favorite != null) {
+                where =
+                        where.and(
+                                Expression.property("favorite")
+                                        .equalTo(Expression.booleanValue(favorite)));
+            }
+            if (trashed != null && trashed) {
+                where =
+                        where.and(
+                                Expression.property("trashed")
+                                        .equalTo(Expression.booleanValue(true)));
+            } else {
+                where =
+                        where.and(
+                                Expression.property("trashed")
+                                        .equalTo(Expression.booleanValue(false))
+                                        .or(Expression.property("trashed").isNotValued()));
             }
 
-            String col = switch (sortBy != null ? sortBy : "modified_at") {
-                case "created_at" -> "created_at";
-                case "size"       -> "file_size";
-                case "file_path"  -> "file_path";
-                default           -> "modified_at";
-            };
-            Ordering ordering = "ASC".equalsIgnoreCase(sortOrder)
-                    ? Ordering.property(col).ascending()
-                    : Ordering.property(col).descending();
+            String col =
+                    switch (sortBy != null ? sortBy : "modified_at") {
+                        case "created_at" -> "created_at";
+                        case "size" -> "file_size";
+                        case "file_path" -> "file_path";
+                        default -> "modified_at";
+                    };
+            Ordering ordering =
+                    "ASC".equalsIgnoreCase(sortOrder)
+                            ? Ordering.property(col).ascending()
+                            : Ordering.property(col).descending();
 
-            Query q = QueryBuilder.select(IMAGE_FIELDS)
-                    .from(DataSource.collection(defaultCollection))
-                    .where(where)
-                    .orderBy(ordering)
-                    .limit(Expression.intValue(limit), Expression.intValue((page - 1) * limit));
+            Query q =
+                    QueryBuilder.select(IMAGE_FIELDS)
+                            .from(DataSource.collection(defaultCollection))
+                            .where(where)
+                            .orderBy(ordering)
+                            .limit(
+                                    Expression.intValue(limit),
+                                    Expression.intValue((page - 1) * limit));
 
             ResultSet rs = q.execute();
             List<ImageRecord> images = new ArrayList<>();
             for (Result r : rs.allResults()) {
                 ImageRecord img = resultToImageRecord(r);
-                // Tag filter (post-query, Couchbase Lite doesn't support array containsAll natively)
+                // Tag filter (post-query, Couchbase Lite doesn't support array containsAll
+                // natively)
                 if (tags != null && !tags.isEmpty()) {
                     if (img.tags == null || !img.tags.containsAll(tags)) continue;
                 }
@@ -323,7 +480,8 @@ public class DatabaseRepository {
                     String fp = img.file_path != null ? img.file_path.toLowerCase() : "";
                     int dot = fp.lastIndexOf('.');
                     String ext = dot >= 0 ? fp.substring(dot + 1) : "";
-                    boolean matched = extensions.stream().anyMatch(e -> e.toLowerCase().equals(ext));
+                    boolean matched =
+                            extensions.stream().anyMatch(e -> e.toLowerCase().equals(ext));
                     if (!matched) continue;
                 }
                 images.add(img);
@@ -337,9 +495,13 @@ public class DatabaseRepository {
 
     public List<String> listAllTags() {
         try {
-            Query q = QueryBuilder.select(SelectResult.property("tags"))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("image")));
+            Query q =
+                    QueryBuilder.select(SelectResult.property("tags"))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("image"))
+                                            .and(notTrashed()));
             ResultSet rs = q.execute();
             Set<String> tagSet = new LinkedHashSet<>();
             for (Result r : rs.allResults()) {
@@ -362,10 +524,15 @@ public class DatabaseRepository {
 
     public ImageRecord findImageByPath(String path) {
         try {
-            Query q = QueryBuilder.select(IMAGE_FIELDS)
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("image"))
-                            .and(Expression.property("file_path").equalTo(Expression.string(path))));
+            Query q =
+                    QueryBuilder.select(IMAGE_FIELDS)
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("image"))
+                                            .and(
+                                                    Expression.property("file_path")
+                                                            .equalTo(Expression.string(path))));
             ResultSet rs = q.execute();
             List<Result> results = rs.allResults();
             if (results.isEmpty()) return null;
@@ -376,13 +543,44 @@ public class DatabaseRepository {
         }
     }
 
+    public ImageRecord findImageById(String id) {
+        try {
+            Document doc = defaultCollection.getDocument(id);
+            if (doc == null) return null;
+            return fromDoc(doc, ImageRecord.class);
+        } catch (Exception e) {
+            LOG.warn("findImageById failed: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public MonitoredFolder findFolderById(String id) {
+        try {
+            Document doc = defaultCollection.getDocument(id);
+            if (doc == null) return null;
+            return fromDoc(doc, MonitoredFolder.class);
+        } catch (Exception e) {
+            LOG.warn("findFolderById failed: " + e.getMessage());
+            return null;
+        }
+    }
+
     public List<ImageRecord> listUnanalysedImages() {
         try {
-            Query q = QueryBuilder.select(IMAGE_FIELDS)
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("image"))
-                            .and(Expression.property("ai_analysed").equalTo(Expression.booleanValue(false))
-                                    .or(Expression.property("ai_analysed").isNotValued())));
+            Query q =
+                    QueryBuilder.select(IMAGE_FIELDS)
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("image"))
+                                            .and(
+                                                    Expression.property("ai_analysed")
+                                                            .equalTo(Expression.booleanValue(false))
+                                                            .or(
+                                                                    Expression.property(
+                                                                                    "ai_analysed")
+                                                                            .isNotValued()))
+                                            .and(notTrashed()));
             ResultSet rs = q.execute();
             List<ImageRecord> images = new ArrayList<>();
             for (Result r : rs.allResults()) images.add(resultToImageRecord(r));
@@ -395,9 +593,13 @@ public class DatabaseRepository {
 
     public List<ImageRecord> listAllImages() {
         try {
-            Query q = QueryBuilder.select(IMAGE_FIELDS)
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("image")));
+            Query q =
+                    QueryBuilder.select(IMAGE_FIELDS)
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("image"))
+                                            .and(notTrashed()));
             ResultSet rs = q.execute();
             List<ImageRecord> images = new ArrayList<>();
             for (Result r : rs.allResults()) images.add(resultToImageRecord(r));
@@ -411,16 +613,21 @@ public class DatabaseRepository {
     public Map<String, Long> getImageDateCounts() {
         Map<String, Long> counts = new TreeMap<>(Collections.reverseOrder());
         try {
-            Query q = QueryBuilder.select(SelectResult.property("modified_at"))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("image")));
+            Query q =
+                    QueryBuilder.select(SelectResult.property("modified_at"))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("image"))
+                                            .and(notTrashed()));
             ResultSet rs = q.execute();
             for (Result r : rs.allResults()) {
                 long modifiedAt = r.getLong("modified_at");
                 if (modifiedAt > 0) {
-                    java.time.LocalDate date = java.time.Instant.ofEpochMilli(modifiedAt)
-                            .atZone(java.time.ZoneId.systemDefault())
-                            .toLocalDate();
+                    java.time.LocalDate date =
+                            java.time.Instant.ofEpochMilli(modifiedAt)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate();
                     String dateStr = date.toString();
                     counts.put(dateStr, counts.getOrDefault(dateStr, 0L) + 1);
                 }
@@ -440,12 +647,18 @@ public class DatabaseRepository {
         void onProgress(int deleted, int total);
     }
 
-    public void deleteImagesByFolderIdWithProgress(String folderId, DeleteProgressCallback callback) {
+    public void deleteImagesByFolderIdWithProgress(
+            String folderId, DeleteProgressCallback callback) {
         try {
-            Query q = QueryBuilder.select(SelectResult.expression(Meta.id))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("image"))
-                            .and(Expression.property("folder_id").equalTo(Expression.string(folderId))));
+            Query q =
+                    QueryBuilder.select(SelectResult.expression(Meta.id))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("image"))
+                                            .and(
+                                                    Expression.property("folder_id")
+                                                            .equalTo(Expression.string(folderId))));
             ResultSet rs = q.execute();
             List<Result> results = rs.allResults();
             int total = results.size();
@@ -464,17 +677,26 @@ public class DatabaseRepository {
                 }
             }
         } catch (Exception e) {
-            LOG.warnf("deleteImagesByFolderIdWithProgress failed for folder %s: %s", folderId, e.getMessage());
+            LOG.warnf(
+                    "deleteImagesByFolderIdWithProgress failed for folder %s: %s",
+                    folderId, e.getMessage());
             throw new RuntimeException(e);
         }
     }
 
     public long countImagesByFolderId(String folderId) {
         try {
-            Query q = QueryBuilder.select(SelectResult.expression(Function.count(Expression.string("*"))))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("image"))
-                            .and(Expression.property("folder_id").equalTo(Expression.string(folderId))));
+            Query q =
+                    QueryBuilder.select(
+                                    SelectResult.expression(Function.count(Expression.string("*"))))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("image"))
+                                            .and(
+                                                    Expression.property("folder_id")
+                                                            .equalTo(Expression.string(folderId)))
+                                            .and(notTrashed()));
             ResultSet rs = q.execute();
             List<Result> results = rs.allResults();
             return results.isEmpty() ? 0 : results.get(0).getLong(0);
@@ -486,9 +708,14 @@ public class DatabaseRepository {
 
     public long countAllImages() {
         try {
-            Query q = QueryBuilder.select(SelectResult.expression(Function.count(Expression.string("*"))))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("image")));
+            Query q =
+                    QueryBuilder.select(
+                                    SelectResult.expression(Function.count(Expression.string("*"))))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("image"))
+                                            .and(notTrashed()));
             ResultSet rs = q.execute();
             List<Result> results = rs.allResults();
             return results.isEmpty() ? 0 : results.get(0).getLong(0);
@@ -503,14 +730,14 @@ public class DatabaseRepository {
     // -------------------------------------------------------------------------
 
     private static final SelectResult[] NOTIFICATION_FIELDS = {
-            SelectResult.expression(Meta.id),
-            SelectResult.property("id"),
-            SelectResult.property("event_type"),
-            SelectResult.property("message"),
-            SelectResult.property("detail"),
-            SelectResult.property("ts"),
-            SelectResult.property("read"),
-            SelectResult.property("type"),
+        SelectResult.expression(Meta.id),
+        SelectResult.property("id"),
+        SelectResult.property("event_type"),
+        SelectResult.property("message"),
+        SelectResult.property("detail"),
+        SelectResult.property("ts"),
+        SelectResult.property("read"),
+        SelectResult.property("type"),
     };
 
     public void saveNotification(NotificationRecord n) {
@@ -519,22 +746,32 @@ public class DatabaseRepository {
 
     public List<NotificationRecord> listNotifications(String search, String eventType) {
         try {
-            Expression where = Expression.property("type").equalTo(Expression.string("notification"));
+            Expression where =
+                    Expression.property("type").equalTo(Expression.string("notification"));
             if (eventType != null && !eventType.isBlank()) {
-                where = where.and(Expression.property("event_type").equalTo(Expression.string(eventType)));
+                where =
+                        where.and(
+                                Expression.property("event_type")
+                                        .equalTo(Expression.string(eventType)));
             }
             if (search != null && !search.isBlank()) {
                 String lc = "%" + search.toLowerCase() + "%";
-                where = where.and(
-                        Expression.property("message").like(Expression.string(lc))
-                                .or(Expression.property("detail").like(Expression.string(lc)))
-                                .or(Expression.property("event_type").like(Expression.string(lc)))
-                );
+                where =
+                        where.and(
+                                Expression.property("message")
+                                        .like(Expression.string(lc))
+                                        .or(
+                                                Expression.property("detail")
+                                                        .like(Expression.string(lc)))
+                                        .or(
+                                                Expression.property("event_type")
+                                                        .like(Expression.string(lc))));
             }
-            Query q = QueryBuilder.select(NOTIFICATION_FIELDS)
-                    .from(DataSource.collection(defaultCollection))
-                    .where(where)
-                    .orderBy(Ordering.property("ts").descending());
+            Query q =
+                    QueryBuilder.select(NOTIFICATION_FIELDS)
+                            .from(DataSource.collection(defaultCollection))
+                            .where(where)
+                            .orderBy(Ordering.property("ts").descending());
             ResultSet rs = q.execute();
             List<NotificationRecord> list = new ArrayList<>();
             for (Result r : rs.allResults()) {
@@ -556,11 +793,19 @@ public class DatabaseRepository {
 
     public long countUnreadNotifications() {
         try {
-            Query q = QueryBuilder.select(SelectResult.expression(Function.count(Expression.string("*"))))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("notification"))
-                            .and(Expression.property("read").equalTo(Expression.booleanValue(false))
-                                    .or(Expression.property("read").isNotValued())));
+            Query q =
+                    QueryBuilder.select(
+                                    SelectResult.expression(Function.count(Expression.string("*"))))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("notification"))
+                                            .and(
+                                                    Expression.property("read")
+                                                            .equalTo(Expression.booleanValue(false))
+                                                            .or(
+                                                                    Expression.property("read")
+                                                                            .isNotValued())));
             ResultSet rs = q.execute();
             List<Result> results = rs.allResults();
             return results.isEmpty() ? 0 : results.get(0).getLong(0);
@@ -571,11 +816,18 @@ public class DatabaseRepository {
 
     public void markAllNotificationsRead() {
         try {
-            Query q = QueryBuilder.select(SelectResult.expression(Meta.id))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("notification"))
-                            .and(Expression.property("read").equalTo(Expression.booleanValue(false))
-                                    .or(Expression.property("read").isNotValued())));
+            Query q =
+                    QueryBuilder.select(SelectResult.expression(Meta.id))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("notification"))
+                                            .and(
+                                                    Expression.property("read")
+                                                            .equalTo(Expression.booleanValue(false))
+                                                            .or(
+                                                                    Expression.property("read")
+                                                                            .isNotValued())));
             ResultSet rs = q.execute();
             for (Result r : rs.allResults()) {
                 String docId = r.getString(0);
@@ -593,9 +845,12 @@ public class DatabaseRepository {
 
     public void deleteAllNotifications() {
         try {
-            Query q = QueryBuilder.select(SelectResult.expression(Meta.id))
-                    .from(DataSource.collection(defaultCollection))
-                    .where(Expression.property("type").equalTo(Expression.string("notification")));
+            Query q =
+                    QueryBuilder.select(SelectResult.expression(Meta.id))
+                            .from(DataSource.collection(defaultCollection))
+                            .where(
+                                    Expression.property("type")
+                                            .equalTo(Expression.string("notification")));
             ResultSet rs = q.execute();
             for (Result r : rs.allResults()) {
                 String docId = r.getString(0);
@@ -605,6 +860,28 @@ public class DatabaseRepository {
             }
         } catch (Exception e) {
             LOG.warn("deleteAllNotifications failed: " + e.getMessage());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Favorites
+    // -------------------------------------------------------------------------
+
+    public ImageRecord toggleFavorite(String imageId) {
+        try {
+            Document doc = defaultCollection.getDocument(imageId);
+            if (doc == null) return null;
+
+            MutableDocument mutable = doc.toMutable();
+            boolean currentVal = mutable.getBoolean("favorite");
+            mutable.setBoolean("favorite", !currentVal);
+            defaultCollection.save(mutable);
+
+            Document updated = defaultCollection.getDocument(imageId);
+            return fromDoc(updated, ImageRecord.class);
+        } catch (Exception e) {
+            LOG.warnf("toggleFavorite failed for %s: %s", imageId, e.getMessage());
+            throw new RuntimeException("Failed to toggle favorite for " + imageId, e);
         }
     }
 
@@ -625,6 +902,8 @@ public class DatabaseRepository {
         img.created_at = r.getLong("created_at");
         img.indexed_at = r.getLong("indexed_at");
         img.ai_analysed = r.getBoolean("ai_analysed");
+        img.favorite = r.getBoolean("favorite");
+        img.trashed = r.getBoolean("trashed");
         img.thumbnail_path = r.getString("thumbnail_path");
         Array arr = r.getArray("tags");
         if (arr != null) {

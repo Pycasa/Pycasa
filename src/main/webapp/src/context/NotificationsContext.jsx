@@ -22,12 +22,17 @@ const PROGRESS_TYPES = new Set([
 ]);
 
 export const NotificationsProvider = ({ children }) => {
-    const [notifications, setNotifications] = useState([]);   // DB-persisted
-    const [liveProgress, setLiveProgress] = useState({});     // type -> latest progress event (not in DB)
+    const [notifications, setNotifications] = useState([]); // DB-persisted
+    const [liveProgress, setLiveProgress] = useState({}); // type -> latest progress event (not in DB)
     const [unreadCount, setUnreadCount] = useState(0);
     const [connected, setConnected] = useState(false);
     const [scanStatus, setScanStatus] = useState({ is_scanning: false, files_found: 0 });
-    const [aiStatus, setAiStatus] = useState({ is_running: false, processed_files: 0, total_files: 0, current_file: "" });
+    const [aiStatus, setAiStatus] = useState({
+        is_running: false,
+        processed_files: 0,
+        total_files: 0,
+        current_file: '',
+    });
     const wsRef = useRef(null);
     const reconnectTimer = useRef(null);
     const mountedRef = useRef(true);
@@ -40,10 +45,10 @@ export const NotificationsProvider = ({ children }) => {
                     const scan = await api.images.getScanStatus();
                     setScanStatus({
                         is_scanning: scan.is_scanning || scan.running,
-                        files_found: scan.files_found || scan.scanned
+                        files_found: scan.files_found || scan.scanned,
                     });
                 } catch (e) {
-                    console.error("Failed to fetch initial scan status:", e);
+                    console.error('Failed to fetch initial scan status:', e);
                 }
                 try {
                     const ai = await api.ai.getAnalysisStatus();
@@ -51,10 +56,10 @@ export const NotificationsProvider = ({ children }) => {
                         is_running: ai.is_running || ai.running,
                         processed_files: ai.processed_files || ai.analysed,
                         total_files: ai.total_files || ai.total,
-                        current_file: ai.current_file || ""
+                        current_file: ai.current_file || '',
                     });
                 } catch (e) {
-                    console.error("Failed to fetch initial AI status:", e);
+                    console.error('Failed to fetch initial AI status:', e);
                 }
             };
             fetchInitialStatuses();
@@ -66,7 +71,7 @@ export const NotificationsProvider = ({ children }) => {
         try {
             const data = await api.notifications.list(search, eventType);
             setNotifications(data || []);
-            const unread = (data || []).filter(n => !n.read).length;
+            const unread = (data || []).filter((n) => !n.read).length;
             setUnreadCount(unread);
         } catch (e) {
             // silently ignore — server may not be ready yet
@@ -88,16 +93,26 @@ export const NotificationsProvider = ({ children }) => {
         } else if (event.type === 'scan:error') {
             setScanStatus({ is_scanning: false, files_found: 0 });
         } else if (event.type === 'ai:started') {
-            setAiStatus({ is_running: true, processed_files: 0, total_files: event.payload.total || 0, current_file: "" });
+            setAiStatus({
+                is_running: true,
+                processed_files: 0,
+                total_files: event.payload.total || 0,
+                current_file: '',
+            });
         } else if (event.type === 'ai:progress') {
             setAiStatus({
                 is_running: true,
                 processed_files: event.payload.analysed,
                 total_files: event.payload.total,
-                current_file: event.payload.current_file || ""
+                current_file: event.payload.current_file || '',
             });
         } else if (event.type === 'ai:completed' || event.type === 'ai:error') {
-            setAiStatus({ is_running: false, processed_files: 0, total_files: 0, current_file: "" });
+            setAiStatus({
+                is_running: false,
+                processed_files: 0,
+                total_files: 0,
+                current_file: '',
+            });
         }
 
         if (PROGRESS_TYPES.has(event.type)) {
@@ -105,23 +120,39 @@ export const NotificationsProvider = ({ children }) => {
             const key = event.payload?.folder_id
                 ? `${event.type}:${event.payload.folder_id}`
                 : event.type;
-            setLiveProgress(prev => ({ ...prev, [key]: event }));
+            setLiveProgress((prev) => ({ ...prev, [key]: event }));
         } else {
             // Terminal events clear their corresponding progress entry
             if (event.type === 'scan:completed' || event.type === 'scan:error') {
-                setLiveProgress(prev => { const n = { ...prev }; delete n['scan:progress']; return n; });
+                setLiveProgress((prev) => {
+                    const n = { ...prev };
+                    delete n['scan:progress'];
+                    return n;
+                });
             }
             if (event.type === 'ai:completed' || event.type === 'ai:error') {
-                setLiveProgress(prev => { const n = { ...prev }; delete n['ai:progress']; return n; });
+                setLiveProgress((prev) => {
+                    const n = { ...prev };
+                    delete n['ai:progress'];
+                    return n;
+                });
             }
             if (event.type === 'folder-delete:completed' || event.type === 'folder-delete:error') {
-                setLiveProgress(prev => { const n = { ...prev }; delete n['folder-delete:progress']; return n; });
+                setLiveProgress((prev) => {
+                    const n = { ...prev };
+                    delete n['folder-delete:progress'];
+                    return n;
+                });
             }
             // Clear per-folder scan progress when that folder's scan finishes/cancels/errors
-            if (['scan:folder:completed', 'scan:folder:cancelled', 'scan:folder:error'].includes(event.type)) {
+            if (
+                ['scan:folder:completed', 'scan:folder:cancelled', 'scan:folder:error'].includes(
+                    event.type
+                )
+            ) {
                 const fid = event.payload?.folder_id;
                 if (fid) {
-                    setLiveProgress(prev => {
+                    setLiveProgress((prev) => {
                         const n = { ...prev };
                         delete n[`scan:folder:progress:${fid}`];
                         delete n[`scan:cancelling:${fid}`];
@@ -139,8 +170,8 @@ export const NotificationsProvider = ({ children }) => {
                 ts: event.ts || Date.now(),
                 read: false,
             };
-            setNotifications(prev => [newNotif, ...prev]);
-            setUnreadCount(prev => prev + 1);
+            setNotifications((prev) => [newNotif, ...prev]);
+            setUnreadCount((prev) => prev + 1);
         }
     }, []);
 
@@ -161,7 +192,11 @@ export const NotificationsProvider = ({ children }) => {
 
         ws.onmessage = (e) => {
             if (!mountedRef.current) return;
-            try { handleEvent(JSON.parse(e.data)); } catch { /* ignore */ }
+            try {
+                handleEvent(JSON.parse(e.data));
+            } catch {
+                /* ignore */
+            }
         };
 
         ws.onclose = () => {
@@ -186,29 +221,35 @@ export const NotificationsProvider = ({ children }) => {
     const markRead = useCallback(async (id) => {
         try {
             await api.notifications.markRead(id);
-            setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-            setUnreadCount(prev => Math.max(0, prev - 1));
-        } catch { /* ignore */ }
+            setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+        } catch {
+            /* ignore */
+        }
     }, []);
 
     const markAllRead = useCallback(async () => {
         try {
             await api.notifications.markAllRead();
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
             setUnreadCount(0);
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
     }, []);
 
     const deleteOne = useCallback(async (id) => {
         try {
             await api.notifications.delete(id);
-            setNotifications(prev => {
-                const removed = prev.find(n => n.id === id);
-                const next = prev.filter(n => n.id !== id);
-                if (removed && !removed.read) setUnreadCount(c => Math.max(0, c - 1));
+            setNotifications((prev) => {
+                const removed = prev.find((n) => n.id === id);
+                const next = prev.filter((n) => n.id !== id);
+                if (removed && !removed.read) setUnreadCount((c) => Math.max(0, c - 1));
                 return next;
             });
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
     }, []);
 
     const deleteAll = useCallback(async () => {
@@ -216,25 +257,29 @@ export const NotificationsProvider = ({ children }) => {
             await api.notifications.deleteAll();
             setNotifications([]);
             setUnreadCount(0);
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
     }, []);
 
     const refresh = useCallback((search, eventType) => loadFromDb(search, eventType), [loadFromDb]);
 
     return (
-        <NotificationsContext.Provider value={{
-            notifications,
-            liveProgress,
-            unreadCount,
-            connected,
-            scanStatus,
-            aiStatus,
-            markRead,
-            markAllRead,
-            deleteOne,
-            deleteAll,
-            refresh,
-        }}>
+        <NotificationsContext.Provider
+            value={{
+                notifications,
+                liveProgress,
+                unreadCount,
+                connected,
+                scanStatus,
+                aiStatus,
+                markRead,
+                markAllRead,
+                deleteOne,
+                deleteAll,
+                refresh,
+            }}
+        >
             {children}
         </NotificationsContext.Provider>
     );

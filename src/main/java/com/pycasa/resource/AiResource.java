@@ -7,7 +7,6 @@ import com.pycasa.service.AiService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
-
 import java.util.List;
 import java.util.Map;
 
@@ -16,26 +15,26 @@ import java.util.Map;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AiResource {
 
-    @Inject
-    AiService aiService;
+    @Inject AiService aiService;
 
-    @Inject
-    DatabaseRepository db;
+    @Inject DatabaseRepository db;
 
     @GET
     @Path("/analysis-status")
     public Response getAnalysisStatus() {
         AiService.AnalysisStatus status = aiService.getAnalysisStatus();
-        return Response.ok(Map.of(
-                "running", status.running(),
-                "is_running", status.running(),
-                "analysed", status.analysed(),
-                "processed_files", status.analysed(),
-                "total", status.total(),
-                "total_files", status.total(),
-                "status", status.status(),
-                "current_file", status.currentFile() != null ? status.currentFile() : ""
-        )).build();
+        return Response.ok(
+                        Map.of(
+                                "running", status.running(),
+                                "is_running", status.running(),
+                                "analysed", status.analysed(),
+                                "processed_files", status.analysed(),
+                                "total", status.total(),
+                                "total_files", status.total(),
+                                "status", status.status(),
+                                "current_file",
+                                        status.currentFile() != null ? status.currentFile() : ""))
+                .build();
     }
 
     @POST
@@ -52,12 +51,14 @@ public class AiResource {
         String imagePath = body != null ? body.get("image_path") : null;
         if (imagePath == null) {
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(Map.of("error", "image_path is required")).build();
+                    .entity(Map.of("error", "image_path is required"))
+                    .build();
         }
         ImageRecord img = db.findImageByPath(imagePath);
         if (img == null) {
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity(Map.of("error", "Image not found")).build();
+                    .entity(Map.of("error", "Image not found"))
+                    .build();
         }
         try {
             AppSettings settings = db.get("settings", AppSettings.class);
@@ -65,8 +66,7 @@ public class AiResource {
             aiService.analyseImage(img, settings);
             return Response.ok(db.get(img.id, ImageRecord.class)).build();
         } catch (Exception e) {
-            return Response.serverError()
-                    .entity(Map.of("error", e.getMessage())).build();
+            return Response.serverError().entity(Map.of("error", e.getMessage())).build();
         }
     }
 

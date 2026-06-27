@@ -5,7 +5,7 @@ import {
     DialogHeader,
     DialogTitle,
     DialogFooter,
-    DialogDescription
+    DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Folder, ChevronRight, ChevronLeft, Home } from 'lucide-react';
@@ -30,9 +30,16 @@ const FolderPicker = ({ open, onOpenChange, onSelect }) => {
             setCurrentPath(data.path);
             setFolders(data.entries || []);
             // TODO: parent path logic needs to be verified based on backend changes
-            setParent(data.path === '/' || data.path.endsWith(':\\') ? null : data.path.substring(0, data.path.lastIndexOf(data.path.includes('\\') ? '\\' : '/')));
+            setParent(
+                data.path === '/' || data.path.endsWith(':\\')
+                    ? null
+                    : data.path.substring(
+                          0,
+                          data.path.lastIndexOf(data.path.includes('\\') ? '\\' : '/')
+                      )
+            );
         } catch (error) {
-            console.error("Failed to list directory", error);
+            console.error('Failed to list directory', error);
             setFolders([]);
         } finally {
             setLoading(false);
@@ -74,7 +81,13 @@ const FolderPicker = ({ open, onOpenChange, onSelect }) => {
                             <Button variant="ghost" size="icon" onClick={handleGoHome} title="Home">
                                 <Home className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={handleGoBack} disabled={!parent} title="Back">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleGoBack}
+                                disabled={!parent}
+                                title="Back"
+                            >
                                 <ChevronLeft className="w-4 h-4" />
                             </Button>
                         </div>
@@ -87,7 +100,9 @@ const FolderPicker = ({ open, onOpenChange, onSelect }) => {
                         {loading ? (
                             <div className="p-8 text-center text-slate-500">Loading...</div>
                         ) : folders?.length === 0 ? (
-                            <div className="p-8 text-center text-slate-500">No folders found in this directory.</div>
+                            <div className="p-8 text-center text-slate-500">
+                                No folders found in this directory.
+                            </div>
                         ) : (
                             <div className="divide-y divide-slate-100">
                                 {folders?.map((folder) => (
@@ -98,7 +113,9 @@ const FolderPicker = ({ open, onOpenChange, onSelect }) => {
                                     >
                                         <div className="flex items-center gap-3">
                                             <Folder className="w-4 h-4 text-primary fill-primary/10" />
-                                            <span className="text-sm font-medium text-slate-700">{folder.name}</span>
+                                            <span className="text-sm font-medium text-slate-700">
+                                                {folder.name}
+                                            </span>
                                         </div>
                                         <ChevronRight className="w-4 h-4 text-slate-300" />
                                     </button>
@@ -113,7 +130,9 @@ const FolderPicker = ({ open, onOpenChange, onSelect }) => {
                         Choose the current directory as the source.
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
                         <Button onClick={handleSelect}>Select Current Folder</Button>
                     </div>
                 </DialogFooter>

@@ -8,23 +8,20 @@ import io.github.ollama4j.models.generate.OllamaGenerateRequest;
 import io.github.ollama4j.models.response.OllamaResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
-
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jboss.logging.Logger;
 
 @ApplicationScoped
 public class AiService {
 
     private static final Logger LOG = Logger.getLogger(AiService.class);
 
-    @Inject
-    DatabaseRepository db;
+    @Inject DatabaseRepository db;
 
-    @Inject
-    NotificationService notificationService;
+    @Inject NotificationService notificationService;
 
     private final AtomicBoolean analysing = new AtomicBoolean(false);
     private final AtomicInteger analysed = new AtomicInteger(0);
@@ -32,15 +29,17 @@ public class AiService {
     private volatile String currentStatus = "idle";
     private volatile String currentFile = "";
 
-    public record AnalysisStatus(boolean running, int analysed, int total, String status, String currentFile) {}
+    public record AnalysisStatus(
+            boolean running, int analysed, int total, String status, String currentFile) {}
 
     public AnalysisStatus getAnalysisStatus() {
-        return new AnalysisStatus(analysing.get(), analysed.get(), total.get(), currentStatus, currentFile);
+        return new AnalysisStatus(
+                analysing.get(), analysed.get(), total.get(), currentStatus, currentFile);
     }
 
     public void triggerBatchAnalysis(boolean rerun) {
         if (analysing.compareAndSet(false, true)) {
-new Thread(() -> doBatchAnalysis(rerun)).start();
+            new Thread(() -> doBatchAnalysis(rerun)).start();
         }
     }
 
@@ -51,11 +50,15 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
             total.set(images.size());
             analysed.set(0);
 
-            notificationService.broadcast("ai:started", Map.of(
-                    "message", "AI analysis started",
-                    "total", images.size(),
-                    "rerun", rerun
-            ));
+            notificationService.broadcast(
+                    "ai:started",
+                    Map.of(
+                            "message",
+                            "AI analysis started",
+                            "total",
+                            images.size(),
+                            "rerun",
+                            rerun));
 
             AppSettings settings = db.get("settings", AppSettings.class);
             if (settings == null) settings = new AppSettings();
@@ -65,45 +68,57 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
                     // Notify progress before analysing
                     String filename = new File(img.file_path).getName();
                     currentFile = filename;
-                    notificationService.broadcast("ai:progress", Map.of(
-                            "analysed", analysed.get(),
-                            "total", total.get(),
-                            "current_file", filename
-                    ));
+                    notificationService.broadcast(
+                            "ai:progress",
+                            Map.of(
+                                    "analysed", analysed.get(),
+                                    "total", total.get(),
+                                    "current_file", filename));
 
                     analyseImage(img, settings);
                     int done = analysed.incrementAndGet();
 
                     // Notify after each image completes
-                    notificationService.broadcast("ai:progress", Map.of(
-                            "analysed", done,
-                            "total", total.get(),
-                            "current_file", filename
-                    ));
+                    notificationService.broadcast(
+                            "ai:progress",
+                            Map.of(
+                                    "analysed", done,
+                                    "total", total.get(),
+                                    "current_file", filename));
                 } catch (Exception e) {
                     LOG.warnf("Failed to analyse image %s: %s", img.file_path, e.getMessage());
-                    notificationService.broadcast("ai:error", Map.of(
-                            "message", "Failed: " + new File(img.file_path).getName(),
-                            "detail", e.getMessage() != null ? e.getMessage() : "unknown error"
-                    ));
+                    notificationService.broadcast(
+                            "ai:error",
+                            Map.of(
+                                    "message",
+                                    "Failed: " + new File(img.file_path).getName(),
+                                    "detail",
+                                    e.getMessage() != null ? e.getMessage() : "unknown error"));
                 }
             }
 
             currentStatus = "completed";
             int done = analysed.get();
             LOG.infof("Batch analysis complete. Analysed %d images.", done);
-            notificationService.broadcast("ai:completed", Map.of(
-                    "message", "AI analysis complete",
-                    "analysed", done,
-                    "total", total.get()
-            ));
+            notificationService.broadcast(
+                    "ai:completed",
+                    Map.of(
+                            "message",
+                            "AI analysis complete",
+                            "analysed",
+                            done,
+                            "total",
+                            total.get()));
         } catch (Exception e) {
             currentStatus = "error";
             LOG.error("Batch analysis failed", e);
-            notificationService.broadcast("ai:error", Map.of(
-                    "message", "Batch analysis failed",
-                    "detail", e.getMessage() != null ? e.getMessage() : "unknown error"
-            ));
+            notificationService.broadcast(
+                    "ai:error",
+                    Map.of(
+                            "message",
+                            "Batch analysis failed",
+                            "detail",
+                            e.getMessage() != null ? e.getMessage() : "unknown error"));
         } finally {
             analysing.set(false);
             currentFile = "";
@@ -123,7 +138,8 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
     }
 
     private void analyseWithOllama(ImageRecord img, AppSettings settings) throws Exception {
-        String ollamaUrl = settings.ollama_url != null ? settings.ollama_url : "http://localhost:11434";
+        String ollamaUrl =
+                settings.ollama_url != null ? settings.ollama_url : "http://localhost:11434";
         String visionModel = settings.vision_model != null ? settings.vision_model : "llava";
         String textModel = settings.text_model != null ? settings.text_model : "llama2";
 
@@ -131,15 +147,18 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
         ollama.setRequestTimeoutSeconds(120);
 
         // --- Call 1: vision model generates a description from the image ---
-        String descriptionPrompt = (settings.image_analysis_prompt != null && !settings.image_analysis_prompt.isBlank())
-                ? settings.image_analysis_prompt
-                : "Describe this image in detail. Focus on the subjects, setting, colors, mood, and any notable elements.";
+        String descriptionPrompt =
+                (settings.image_analysis_prompt != null
+                                && !settings.image_analysis_prompt.isBlank())
+                        ? settings.image_analysis_prompt
+                        : "Describe this image in detail. Focus on the subjects, setting, colors, mood, and any notable elements.";
 
-        OllamaGenerateRequest descRequest = OllamaGenerateRequest.builder()
-                .withModel(visionModel)
-                .withPrompt(descriptionPrompt)
-                .withImages(List.of(new File(img.file_path)))
-                .build();
+        OllamaGenerateRequest descRequest =
+                OllamaGenerateRequest.builder()
+                        .withModel(visionModel)
+                        .withPrompt(descriptionPrompt)
+                        .withImages(List.of(new File(img.file_path)))
+                        .build();
 
         OllamaResult descResult = ollama.generate(descRequest, null);
         String description = descResult.getResponse().trim();
@@ -147,14 +166,14 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
         LOG.debugf("Description for %s: %s", img.file_path, description);
 
         // --- Call 2: text model generates tags from the description ---
-        String tagsPrompt = "Given the following image description, extract 5-10 relevant tags. "
-                + "Return only the tags as a comma-separated list with no additional text or explanation.\n\n"
-                + "Description: " + description;
+        String tagsPrompt =
+                "Given the following image description, extract 5-10 relevant tags. "
+                        + "Return only the tags as a comma-separated list with no additional text or explanation.\n\n"
+                        + "Description: "
+                        + description;
 
-        OllamaGenerateRequest tagsRequest = OllamaGenerateRequest.builder()
-                .withModel(textModel)
-                .withPrompt(tagsPrompt)
-                .build();
+        OllamaGenerateRequest tagsRequest =
+                OllamaGenerateRequest.builder().withModel(textModel).withPrompt(tagsPrompt).build();
 
         OllamaResult tagsResult = ollama.generate(tagsRequest, null);
         List<String> tags = parseTags(tagsResult.getResponse());
@@ -197,9 +216,7 @@ new Thread(() -> doBatchAnalysis(rerun)).start();
         try {
             Ollama ollama = new Ollama(url != null ? url : "http://localhost:11434");
             ollama.setRequestTimeoutSeconds(10);
-            return ollama.listModels().stream()
-                    .map(m -> m.getModel())
-                    .toList();
+            return ollama.listModels().stream().map(m -> m.getModel()).toList();
         } catch (Exception e) {
             LOG.warnf("Could not list Ollama models: %s", e.getMessage());
             return Collections.emptyList();

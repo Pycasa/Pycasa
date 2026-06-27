@@ -5,7 +5,6 @@ import com.pycasa.repository.DatabaseRepository;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
-
 import java.util.Map;
 
 @Path("/api/notifications")
@@ -13,12 +12,11 @@ import java.util.Map;
 @Consumes(MediaType.APPLICATION_JSON)
 public class NotificationsResource {
 
-    @Inject
-    DatabaseRepository db;
+    @Inject DatabaseRepository db;
 
     @GET
-    public Response list(@QueryParam("search") String search,
-                         @QueryParam("event_type") String eventType) {
+    public Response list(
+            @QueryParam("search") String search, @QueryParam("event_type") String eventType) {
         return Response.ok(db.listNotifications(search, eventType)).build();
     }
 

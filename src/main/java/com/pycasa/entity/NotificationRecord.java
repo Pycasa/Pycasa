@@ -6,9 +6,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public class NotificationRecord {
     public String id;
     public String type = "notification";
-    public String event_type;   // e.g. "scan:completed", "ai:error"
+    public String event_type; // e.g. "scan:completed", "ai:error"
     public String message;
-    public String detail;       // optional extra detail
+    public String detail; // optional extra detail
     public long ts;
     public boolean read = false;
 

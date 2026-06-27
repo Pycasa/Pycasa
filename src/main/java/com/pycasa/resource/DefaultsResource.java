@@ -2,11 +2,10 @@ package com.pycasa.resource;
 
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
-import org.jboss.logging.Logger;
-
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import org.jboss.logging.Logger;
 
 @Path("/api/defaults")
 @Produces(MediaType.APPLICATION_JSON)
@@ -17,9 +16,13 @@ public class DefaultsResource {
     @GET
     @Path("/prompts")
     public Response getDefaultPrompts() {
-        return Response.ok(Map.of(
-                "image_analysis_prompt", readResource("default-image-analysis-prompt.txt")
-        )).build();
+        return Response.ok(
+                        Map.of(
+                                "image_analysis_prompt",
+                                        readResource("default-image-analysis-prompt.txt"),
+                                "tag_generation_prompt",
+                                        readResource("default-tag-generation-prompt.txt")))
+                .build();
     }
 
     private String readResource(String name) {

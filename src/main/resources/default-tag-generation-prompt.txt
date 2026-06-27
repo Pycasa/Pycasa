@@ -1,0 +1,1 @@
+Based on the following image description, generate a concise list of relevant tags. Return only a JSON array of lowercase strings, with no explanation. Example: ["outdoor","sunset","landscape","nature"]
