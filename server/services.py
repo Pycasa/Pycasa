@@ -5,6 +5,7 @@ import uuid
 import re
 import base64
 import logging
+import io
 import asyncio
 import threading
 from typing import Set, Dict, List, Optional
@@ -641,8 +642,10 @@ class AiService:
         # --- Call 1: Describe image using vision model ---
         description_prompt = settings["image_analysis_prompt"] or "Describe this image in detail. Focus on the subjects, setting, colors, mood, and any notable elements."
 
-        with open(file_path, "rb") as f:
-            img_b64 = base64.b64encode(f.read()).decode("utf-8")
+        with Image.open(file_path) as img:
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=90)
+            img_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
         desc_payload = {
             "model": vision_model,
