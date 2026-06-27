@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAIStatus } from '@/context/AIStatusContext';
 import { useNotifications } from '@/context/NotificationsContext';
+import { useUpload } from '@/context/UploadContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
@@ -98,6 +99,7 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
     const { scanStatus, unreadCount } = useNotifications();
     const { aiStatus } = useAIStatus();
     const { toast } = useToast();
+    const { startUpload, updateProgress, finishUpload, isCancelled } = useUpload();
     const fileInputRef = useRef(null);
     const [isUploading, setIsUploading] = useState(false);
 
@@ -133,33 +135,47 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
     };
 
     const handleUploadChange = async (e) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
 
         setIsUploading(true);
-        toast({
-            title: 'Uploading files...',
-            description: `Starting upload of ${files.length} images...`,
-        });
+        startUpload(files.length);
 
-        try {
-            await api.images.upload(files);
-            toast({
-                title: 'Upload successful',
-                description: `Successfully uploaded and indexed ${files.length} files.`,
-            });
-            window.dispatchEvent(new CustomEvent('pycasa-image-uploaded'));
-        } catch (error) {
-            toast({
-                title: 'Upload failed',
-                description: error.message,
-                variant: 'destructive',
-            });
-        } finally {
-            setIsUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
+        let succeeded = 0;
+        let failed = 0;
+
+        for (let i = 0; i < files.length; i++) {
+            if (isCancelled()) break;
+
+            const file = files[i];
+            updateProgress(i, file.name);
+
+            try {
+                // Upload one file at a time so we can track progress
+                const form = new FormData();
+                form.append('files', file);
+                await fetch('/api/images/upload', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem('auth_token') || ''}`,
+                    },
+                    body: form,
+                });
+                succeeded++;
+            } catch {
+                failed++;
             }
+
+            updateProgress(i + 1, file.name);
+        }
+
+        finishUpload(failed);
+        setIsUploading(false);
+
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+        if (succeeded > 0) {
+            window.dispatchEvent(new CustomEvent('pycasa-image-uploaded'));
         }
     };
 

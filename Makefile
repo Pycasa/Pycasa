@@ -1,6 +1,8 @@
-.PHONY: help dev build killall pre-dev check-formatting apply-formatting build-docs clean-docs docs-serve
+.PHONY: help dev build docker-image docker-run docker-push killall pre-dev check-formatting apply-formatting build-docs clean-docs docs-serve
 
-ROOT_DIR := $(shell pwd)
+ROOT_DIR    := $(shell pwd)
+DOCKER_IMAGE ?= pycasa
+DOCKER_TAG  ?= latest
 
 help: ## Show available commands
 	@echo "Pycasa"
@@ -91,6 +93,34 @@ build-docs:
 	@echo "Building docs artifacts..."
 	@cd docs && [ -d node_modules ] || npm install
 	@cd docs && npm run build
+
+# ==============================
+# Docker
+# ==============================
+docker-image: ## Build Docker image (DOCKER_IMAGE=pycasa DOCKER_TAG=latest)
+	@echo "Building Docker image $(DOCKER_IMAGE):$(DOCKER_TAG)..."
+	@docker build \
+		-t $(DOCKER_IMAGE):$(DOCKER_TAG) \
+		-t $(DOCKER_IMAGE):$$(date +%Y%m%d) \
+		-f $(ROOT_DIR)/Dockerfile \
+		$(ROOT_DIR)
+	@echo ""
+	@echo "Image built: $(DOCKER_IMAGE):$(DOCKER_TAG)"
+	@echo "To run: make docker-run"
+	@echo ""
+
+docker-run: ## Run the Docker image locally (mounts ./data for persistence)
+	@echo "Running $(DOCKER_IMAGE):$(DOCKER_TAG) on http://localhost:3000 ..."
+	@docker run --rm -it \
+		-p 3000:3000 \
+		-v $(ROOT_DIR)/data:/app/data \
+		--name pycasa \
+		$(DOCKER_IMAGE):$(DOCKER_TAG)
+
+docker-push: ## Push Docker image to registry (set DOCKER_IMAGE=registry/repo)
+	@echo "Pushing $(DOCKER_IMAGE):$(DOCKER_TAG)..."
+	@docker push $(DOCKER_IMAGE):$(DOCKER_TAG)
+	@docker push $(DOCKER_IMAGE):$$(date +%Y%m%d)
 
 clean-docs:
 	@echo "Cleaning docs artifacts..."

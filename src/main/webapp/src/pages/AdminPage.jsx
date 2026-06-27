@@ -12,6 +12,7 @@ import FavoritesView from '@/components/FavoritesView';
 import TrashView from '@/components/TrashView';
 import PlacesView from '@/components/PlacesView';
 import NotificationsPage from '@/pages/NotificationsPage';
+import UploadProgressToast from '@/components/UploadProgressToast';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api';
@@ -157,6 +158,9 @@ const AdminPage = () => {
                     </div>
                 </main>
             </div>
+
+            {/* Global upload progress toast */}
+            <UploadProgressToast />
         </div>
     );
 };
