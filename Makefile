@@ -52,7 +52,7 @@ apply-formatting:
 	@cd $(ROOT_DIR)/docs && npm run format
 
 killall:
-	@lsof -ti :3000 | xargs kill -9 2>/dev/null || true
+	@lsof -ti :3001 | xargs kill -9 2>/dev/null || true
 	@lsof -ti :4173 | xargs kill -9 2>/dev/null || true
 
 # ==============================
@@ -72,7 +72,7 @@ dev: pre-dev killall ## Hot-reload dev mode (FastAPI + Vite)
 			--kill-others \
 			--kill-others-on-fail \
 			"cd src/main/webapp && npm run dev" \
-			".venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 3000 --reload --reload-dir server"
+			".venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 3001 --reload --reload-dir server"
 
 # ==============================
 # Build (production)
@@ -86,7 +86,7 @@ build: pre-dev ## Build production webapp assets
 	@echo ""
 	@echo "Production assets built in src/main/webapp/dist."
 	@echo "To run the production server:"
-	@echo "  .venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 3000"
+	@echo "  .venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 3001"
 	@echo ""
 
 build-docs:
@@ -110,9 +110,9 @@ docker-image: ## Build Docker image (DOCKER_IMAGE=pycasa DOCKER_TAG=latest)
 	@echo ""
 
 docker-run: ## Run the Docker image locally (mounts ./data for persistence)
-	@echo "Running $(DOCKER_IMAGE):$(DOCKER_TAG) on http://localhost:3000 ..."
+	@echo "Running $(DOCKER_IMAGE):$(DOCKER_TAG) on http://localhost:3001 ..."
 	@docker run --rm -it \
-		-p 3000:3000 \
+		-p 3001:3001 \
 		-v $(ROOT_DIR)/data:/app/data \
 		--name pycasa \
 		$(DOCKER_IMAGE):$(DOCKER_TAG)

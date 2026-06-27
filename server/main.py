@@ -9,7 +9,7 @@ import shutil
 from typing import Dict, List, Optional
 from fastapi import FastAPI, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect, Query, BackgroundTasks, Response, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
@@ -25,6 +25,8 @@ from .services import (
 
 logger = logging.getLogger("pycasa.main")
 
+from .admin import create_admin
+
 app = FastAPI(title="Pycasa API", docs_url="/docs")
 
 # Configure CORS
@@ -36,6 +38,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── SQLAdmin (/db) — mounted at module level so it precedes the
+# catch-all Vite proxy route registered at the bottom of this file.
+create_admin(app)
+
 # In-memory sessions token -> User
 SESSIONS: Dict[str, dict] = {}
 
@@ -43,7 +49,7 @@ SESSIONS: Dict[str, dict] = {}
 # Event Handlers
 # -------------------------------------------------------------------------
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     init_db()
     loop = asyncio.get_running_loop()
     notification_service.set_loop(loop)
@@ -1116,6 +1122,9 @@ if is_dev:
 
     @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
     async def proxy_to_vite(path: str, request: Request):
+        if path in ("db", "admin"):
+            return RedirectResponse(url="/db/")
+
         url = httpx.URL(path=request.url.path, query=request.url.query.encode("utf-8"))
         body = await request.body()
         headers = dict(request.headers)

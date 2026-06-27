@@ -12,6 +12,7 @@ import {
     Github,
     Sun,
     Moon,
+    Database,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAIStatus } from '@/context/AIStatusContext';
@@ -54,7 +55,7 @@ const ProfileMenu = ({ username, onLogout }) => {
                         transition={{ duration: 0.12 }}
                         className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700 overflow-hidden z-50"
                     >
-                        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 text-center">
                             <p className="text-xs text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">
                                 Signed in as
                             </p>
@@ -62,12 +63,22 @@ const ProfileMenu = ({ username, onLogout }) => {
                                 {username || 'Admin'}
                             </p>
                         </div>
+                        <a
+                            href="/db"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => setOpen(false)}
+                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border-b border-slate-100 dark:border-slate-700/50"
+                        >
+                            <Database className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                            DB
+                        </a>
                         <button
                             onClick={() => {
                                 setOpen(false);
                                 navigate('/settings');
                             }}
-                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         >
                             <Settings className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                             Settings
@@ -77,7 +88,7 @@ const ProfileMenu = ({ username, onLogout }) => {
                                 setOpen(false);
                                 onLogout();
                             }}
-                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-t border-slate-100 dark:border-slate-700"
+                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-t border-slate-100 dark:border-slate-700"
                         >
                             <LogOut className="w-4 h-4" />
                             Logout

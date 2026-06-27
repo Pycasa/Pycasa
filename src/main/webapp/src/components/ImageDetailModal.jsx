@@ -625,19 +625,19 @@ const ImageDetailModal = ({
                 {/* ── Info panel — exact modern DetailPanel structure ─────── */}
                 {showInfo && (
                     <div className="w-[360px] shrink-0 bg-[#0a0a0a] dark:text-gray-200 flex flex-col overflow-hidden">
-                        {/* Header — "× Info" — modern: p-2 + close round ghost + text-lg */}
-                        <section className="relative p-2">
-                            <div className="flex place-items-center gap-2">
-                                <button
-                                    onClick={() => setShowInfo(false)}
-                                    aria-label="Close"
-                                    className="flex items-center justify-center w-9 h-9 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                                >
-                                    <X className="w-5 h-5" strokeWidth={1.8} />
-                                </button>
-                                <p className="text-lg text-gray-200">Info</p>
-                            </div>
-
+                        {/* Header — "× Info" — pinned, never scrolls */}
+                        <div className="shrink-0 flex place-items-center gap-2 p-2">
+                            <button
+                                onClick={() => setShowInfo(false)}
+                                aria-label="Close"
+                                className="flex items-center justify-center w-9 h-9 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                            >
+                                <X className="w-5 h-5" strokeWidth={1.8} />
+                            </button>
+                            <p className="text-lg text-gray-200">Info</p>
+                        </div>
+                        {/* Scrollable content body */}
+                        <section className="relative flex-1 overflow-y-auto min-h-0">
                             {/* Description Section */}
                             <div className="mt-6 px-4">
                                 <SectionHeader>Description</SectionHeader>
