@@ -6,7 +6,12 @@ import { Heart, Sparkles, Loader2 } from 'lucide-react';
 const ImageCard = ({ image, isSelected, onSelect, rowHeight = 180, onFavoriteToggle }) => {
     const [imgData, setImgData] = useState(image);
     const { aiStatus } = useAIStatus();
-    const [aspectRatio, setAspectRatio] = useState(1.4);
+    const [aspectRatio, setAspectRatio] = useState(() => {
+        if (image && image.width && image.height) {
+            return image.width / image.height;
+        }
+        return 1.4;
+    });
     const [togglingFav, setTogglingFav] = useState(false);
     const imgRef = useRef(null);
 
@@ -35,6 +40,9 @@ const ImageCard = ({ image, isSelected, onSelect, rowHeight = 180, onFavoriteTog
 
     useEffect(() => {
         setImgData(image);
+        if (image && image.width && image.height) {
+            setAspectRatio(image.width / image.height);
+        }
     }, [image]);
 
     // Handle image load to update aspect ratio

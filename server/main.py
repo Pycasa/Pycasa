@@ -11,13 +11,14 @@ from fastapi import FastAPI, Depends, HTTPException, Header, WebSocket, WebSocke
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from PIL import Image
+from PIL import Image, ImageOps
 
-from .database import get_db, init_db, DB_DIR
+from .database import get_db, init_db, DB_DIR, log_event
 from .schemas import (
     LoginRequest, LoginResponse, SessionResponse, AddFolderRequest, FolderResponse,
     ImageRecordResponse, ImageDetailsResponse, UpdateMetadataRequest, AppSettingsSchema,
-    NotificationResponse, UserSession, SessionInfo
+    NotificationResponse, UserSession, SessionInfo,
+    CreateAlbumRequest, AlbumResponse, AddAlbumImagesRequest, RemoveAlbumImagesRequest, AlbumInfo
 )
 from .services import (
     notification_service, scan_service, ai_service, generate_placeholder_thumbnail
@@ -73,7 +74,7 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     return user
 
 # Helper to map database rows to schemas
-def row_to_image_record(row, tags: List[str]) -> dict:
+def row_to_image_record(row, tags: List[str], albums: List[dict] = None) -> dict:
     keys = list(row.keys()) if hasattr(row, "keys") else []
     return {
         "id": row["id"],
@@ -81,6 +82,7 @@ def row_to_image_record(row, tags: List[str]) -> dict:
         "folder_id": row["folder_id"],
         "description": row["description"],
         "tags": tags,
+        "albums": albums or [],
         "ocr_text": row["ocr_text"],
         "file_size": row["file_size"],
         "modified_at": row["modified_at"],
@@ -105,6 +107,13 @@ def row_to_image_record(row, tags: List[str]) -> dict:
         "longitude": row["longitude"] if "longitude" in keys else None,
         "location_name": row["location_name"] if "location_name" in keys else None,
     }
+
+def get_image_albums(conn, image_id: str) -> List[dict]:
+    cursor = conn.execute(
+        "SELECT a.id, a.name FROM albums a JOIN album_images ai ON ai.album_id = a.id WHERE ai.image_id = ?",
+        (image_id,)
+    )
+    return [{"id": r["id"], "name": r["name"]} for r in cursor.fetchall()]
 
 # -------------------------------------------------------------------------
 # Auth API
@@ -209,6 +218,7 @@ def add_folder(req: AddFolderRequest):
         except Exception:
             raise HTTPException(status_code=400, detail="Folder already monitored")
 
+    log_event("folder:added", folder_path=req.path, details=f"Added folder monitoring for '{label}'")
     scan_service.start_folder_scan(folder_id, req.path, label)
     return {
         "id": folder_id,
@@ -234,6 +244,7 @@ def rescan_folder(folder_id: str):
     if scan_service.is_scanning_folder(folder_id):
         raise HTTPException(status_code=409, detail="Scan already running for this folder")
 
+    log_event("folder:rescan_triggered", folder_path=folder["path"], details=f"Triggered rescan for '{folder['label']}'")
     scan_service.start_folder_scan(folder_id, folder["path"], folder["label"], force=True)
     return {"message": "Rescan started"}
 
@@ -285,6 +296,8 @@ def run_folder_delete_background(folder_id: str, label: str, path: str):
                     )
 
             conn.execute("DELETE FROM monitored_folders WHERE id = ?", (folder_id,))
+
+        log_event("folder:removed", folder_path=path, details=f"Removed monitored folder '{label}' (unindexed {total} images)")
 
         notification_service.broadcast(
             "folder-delete:completed",
@@ -439,7 +452,8 @@ def list_images(
     size_min: Optional[int] = None,
     size_max: Optional[int] = None,
     favorite: Optional[bool] = None,
-    trashed: bool = False
+    trashed: bool = False,
+    album_id: Optional[str] = None
 ):
     offset = (page - 1) * limit
 
@@ -450,6 +464,10 @@ def list_images(
     if folder_id:
         query += " AND folder_id = ?"
         params.append(folder_id)
+
+    if album_id:
+        query += " AND id IN (SELECT image_id FROM album_images WHERE album_id = ?)"
+        params.append(album_id)
 
     if search:
         query += " AND (file_path LIKE ? OR description LIKE ?)"
@@ -522,7 +540,13 @@ def list_images(
             # Query tags for each image
             cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (row["id"],))
             img_tags = [t["tag"] for t in cursor_tags.fetchall()]
-            images_res.append(row_to_image_record(row, img_tags))
+            # Query albums for each image
+            cursor_albums = conn.execute(
+                "SELECT a.id, a.name FROM albums a JOIN album_images ai ON ai.album_id = a.id WHERE ai.image_id = ?",
+                (row["id"],)
+            )
+            img_albums = [{"id": r["id"], "name": r["name"]} for r in cursor_albums.fetchall()]
+            images_res.append(row_to_image_record(row, img_tags, img_albums))
 
     return images_res
 
@@ -577,8 +601,12 @@ def toggle_favorite(image_id: str):
         updated = cursor.fetchone()
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (image_id,))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
+        albums = get_image_albums(conn, image_id)
 
-    return row_to_image_record(updated, tags)
+    event_type = "file:favorited" if new_fav == 1 else "file:unfavorited"
+    log_event(event_type, file_path=img["file_path"], details="Marked image as favorite" if new_fav == 1 else "Removed image from favorites")
+
+    return row_to_image_record(updated, tags, albums)
 
 @app.get("/api/images/metadata")
 def get_metadata(path: Optional[str] = None, id: Optional[str] = None):
@@ -609,8 +637,9 @@ def get_metadata(path: Optional[str] = None, id: Optional[str] = None):
 
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (img["id"],))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
+        albums = get_image_albums(conn, img["id"])
 
-    return row_to_image_record(img, tags)
+    return row_to_image_record(img, tags, albums)
 
 @app.get("/api/images/details", response_model=ImageDetailsResponse)
 def get_details(path: str):
@@ -624,8 +653,9 @@ def get_details(path: str):
             raise HTTPException(status_code=404, detail="Image not found")
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (img["id"],))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
+        albums = get_image_albums(conn, img["id"])
 
-    record = row_to_image_record(img, tags)
+    record = row_to_image_record(img, tags, albums)
 
     # Fallback to dynamic read if DB lacks dimensions
     if not record.get("width") or not record.get("height"):
@@ -643,6 +673,7 @@ def update_metadata(req: UpdateMetadataRequest):
     img_id = req.id
     file_path = req.file_path
 
+    details_parts = []
     with get_db() as conn:
         if img_id:
             cursor = conn.execute("SELECT * FROM images WHERE id = ?", (img_id,))
@@ -654,12 +685,15 @@ def update_metadata(req: UpdateMetadataRequest):
             raise HTTPException(status_code=404, detail="Image not found")
 
         target_id = img["id"]
+        target_path = img["file_path"]
 
         if req.description is not None:
             conn.execute("UPDATE images SET description = ? WHERE id = ?", (req.description, target_id))
+            details_parts.append(f"description updated")
 
         if req.favorite is not None:
             conn.execute("UPDATE images SET favorite = ? WHERE id = ?", (1 if req.favorite else 0, target_id))
+            details_parts.append("favorite toggled")
 
         if req.tags is not None:
             # Clear old and write new
@@ -669,20 +703,27 @@ def update_metadata(req: UpdateMetadataRequest):
                     "INSERT OR IGNORE INTO image_tags (image_id, tag) VALUES (?, ?)",
                     (target_id, tag.strip().lower())
                 )
+            details_parts.append(f"tags updated to {req.tags}")
 
         # Reload updated record
         cursor = conn.execute("SELECT * FROM images WHERE id = ?", (target_id,))
         updated = cursor.fetchone()
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (target_id,))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
+        albums = get_image_albums(conn, target_id)
 
-    return row_to_image_record(updated, tags)
+    if details_parts:
+        log_event("metadata:updated", file_path=target_path, details=", ".join(details_parts))
+
+    return row_to_image_record(updated, tags, albums)
 
 @app.delete("/api/images")
 def delete_image(folder_id: str, path: str):
     if not path:
         raise HTTPException(status_code=400, detail="path is required")
 
+    event_type = None
+    event_details = None
     with get_db() as conn:
         cursor = conn.execute("SELECT * FROM images WHERE file_path = ?", (path,))
         img = cursor.fetchone()
@@ -700,7 +741,8 @@ def delete_image(folder_id: str, path: str):
             except Exception as e:
                 logger.warning(f"Could not permanently delete files: {e}")
             conn.execute("DELETE FROM images WHERE id = ?", (img["id"],))
-            return {"message": "Image permanently deleted"}
+            event_type = "file:deleted"
+            event_details = "Permanently deleted image file and database record"
         else:
             # Soft delete: move to trash folder
             trash_dir = os.path.join(DB_DIR, "trash")
@@ -722,7 +764,16 @@ def delete_image(folder_id: str, path: str):
                 "UPDATE images SET file_path = ?, trashed = 1, favorite = 0 WHERE id = ?",
                 (new_path, img["id"])
             )
-            return {"message": "Image moved to trash"}
+            event_type = "file:trashed"
+            event_details = f"Moved image to trash: {new_path}"
+
+    if event_type:
+        log_event(event_type, file_path=path, details=event_details)
+
+    if event_type == "file:deleted":
+        return {"message": "Image permanently deleted"}
+    else:
+        return {"message": "Image moved to trash"}
 
 @app.post("/api/images/{image_id}/restore", response_model=ImageRecordResponse)
 def restore_image(image_id: str):
@@ -762,8 +813,10 @@ def restore_image(image_id: str):
         updated = cursor.fetchone()
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (image_id,))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
+        albums = get_image_albums(conn, image_id)
 
-    return row_to_image_record(updated, tags)
+    log_event("file:restored", file_path=new_path, details=f"Restored image from trash to {new_path}")
+    return row_to_image_record(updated, tags, albums)
 
 @app.get("/api/images/scan-status")
 def get_scan_status():
@@ -811,6 +864,7 @@ def get_thumbnail(path: str):
         if not os.path.exists(thumb_file):
             try:
                 with Image.open(path) as pil_img:
+                    pil_img = ImageOps.exif_transpose(pil_img)
                     pil_img.thumbnail((300, 300))
                     if pil_img.mode in ("RGBA", "P"):
                         pil_img = pil_img.convert("RGB")
@@ -912,6 +966,7 @@ async def upload_images(
 
             saved_files.append({"id": img_id, "path": file_path})
             indexed_count += 1
+            log_event("file:uploaded", file_path=file_path, details=f"Uploaded and indexed image file: {file.filename}")
 
             if background_tasks:
                 with get_db() as conn:
@@ -967,6 +1022,7 @@ def update_settings(req: AppSettingsSchema):
     with get_db() as conn:
         conn.execute(query, params)
 
+    log_event("settings:updated", details=f"Updated application settings: {', '.join(req.dict(exclude_unset=True).keys())}")
     return get_settings()
 
 # -------------------------------------------------------------------------
@@ -1088,9 +1144,97 @@ def ping_ai(body: dict):
     url = body.get("url")
     return ai_service.ping_ollama(url)
 
-@app.post("/api/ai/ocr")
-def run_ocr():
-    return {"text": ""}
+# -------------------------------------------------------------------------
+# Albums API
+# -------------------------------------------------------------------------
+@app.get("/api/albums", response_model=List[AlbumResponse])
+def list_albums():
+    with get_db() as conn:
+        cursor = conn.execute("""
+            SELECT a.id, a.name, a.created_at,
+                   (SELECT COUNT(*) FROM album_images WHERE album_id = a.id) as image_count,
+                   (SELECT i.thumbnail_path FROM images i
+                    JOIN album_images ai ON ai.image_id = i.id
+                    WHERE ai.album_id = a.id AND i.trashed = 0
+                    ORDER BY i.modified_at DESC LIMIT 1) as cover_image_thumbnail
+            FROM albums a
+            ORDER BY a.name ASC
+        """)
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "created_at": r["created_at"],
+                "image_count": r["image_count"],
+                "cover_image_thumbnail": r["cover_image_thumbnail"]
+            } for r in rows
+        ]
+
+@app.post("/api/albums", response_model=AlbumResponse)
+def create_album(req: CreateAlbumRequest):
+    import sqlite3
+    if not req.name.strip():
+        raise HTTPException(status_code=400, detail="Album name cannot be empty")
+
+    album_id = "album_" + uuid.uuid4().hex
+    created_at = int(time.time() * 1000)
+
+    with get_db() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO albums (id, name, created_at) VALUES (?, ?, ?)",
+                (album_id, req.name.strip(), created_at)
+            )
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=400, detail="An album with this name already exists")
+
+    return {
+        "id": album_id,
+        "name": req.name.strip(),
+        "created_at": created_at,
+        "image_count": 0,
+        "cover_image_thumbnail": None
+    }
+
+@app.delete("/api/albums/{album_id}")
+def delete_album(album_id: str):
+    with get_db() as conn:
+        cursor = conn.execute("SELECT id FROM albums WHERE id = ?", (album_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Album not found")
+        conn.execute("DELETE FROM albums WHERE id = ?", (album_id,))
+    return {"message": "Album deleted"}
+
+@app.post("/api/albums/{album_id}/images")
+def add_images_to_album(album_id: str, req: AddAlbumImagesRequest):
+    with get_db() as conn:
+        cursor = conn.execute("SELECT id FROM albums WHERE id = ?", (album_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Album not found")
+
+        for img_id in req.image_ids:
+            img_cursor = conn.execute("SELECT id FROM images WHERE id = ?", (img_id,))
+            if img_cursor.fetchone():
+                conn.execute(
+                    "INSERT OR IGNORE INTO album_images (album_id, image_id) VALUES (?, ?)",
+                    (album_id, img_id)
+                )
+    return {"message": f"Added {len(req.image_ids)} images to album"}
+
+@app.delete("/api/albums/{album_id}/images")
+def remove_images_from_album(album_id: str, req: RemoveAlbumImagesRequest):
+    with get_db() as conn:
+        cursor = conn.execute("SELECT id FROM albums WHERE id = ?", (album_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Album not found")
+
+        for img_id in req.image_ids:
+            conn.execute(
+                "DELETE FROM album_images WHERE album_id = ? AND image_id = ?",
+                (album_id, img_id)
+            )
+    return {"message": f"Removed {len(req.image_ids)} images from album"}
 
 # -------------------------------------------------------------------------
 # WebSocket Notifications Endpoint

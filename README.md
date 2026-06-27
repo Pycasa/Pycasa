@@ -60,7 +60,7 @@ curl -fsSL https://raw.githubusercontent.com/Pycasa/Pycasa/main/install.sh | bas
 The script downloads the latest release JAR to `~/.pycasa/`, installs a `pycasa` launcher to `/usr/local/bin`, and prints the URL to open.
 
 ```bash
-pycasa                  # starts on default port 3001
+pycasa                  # starts on default port 3000
 pycasa --port 8080      # starts on a custom port
 ```
 
@@ -86,7 +86,7 @@ java -Dquarkus.http.port=8080 -jar ~/.pycasa/pycasa.jar
 make dev
 ```
 
-Opens at **http://localhost:3001** — UI hot-reloads on file save, Java reloads on next request.
+Opens at **http://localhost:3000** — UI hot-reloads on file save, Java reloads on next request.
 
 ### Build a production jar
 
@@ -126,7 +126,7 @@ Pycasa uses [Tesseract](https://github.com/tesseract-ocr/tesseract) for text ext
 
 ## API Playground
 
-API playground is available at **http://localhost:3001/docs** when the server is running.
+API playground is available at **http://localhost:3000/docs** when the server is running.
 
 ## Tech Stack
 

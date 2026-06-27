@@ -11,6 +11,7 @@ import TimelineView from '@/components/TimelineView.jsx';
 import FavoritesView from '@/components/FavoritesView';
 import TrashView from '@/components/TrashView';
 import PlacesView from '@/components/PlacesView';
+import AlbumsView from '@/components/AlbumsView';
 import NotificationsPage from '@/pages/NotificationsPage';
 import UploadProgressToast from '@/components/UploadProgressToast';
 import { Loader2 } from 'lucide-react';
@@ -29,23 +30,27 @@ const AdminPage = () => {
         ? 'gallery'
         : location.pathname.startsWith('/favorites')
           ? 'favorites'
-          : location.pathname.startsWith('/trash')
-            ? 'trash'
-            : location.pathname.startsWith('/places')
-              ? 'places'
-              : location.pathname.startsWith('/settings')
-                ? 'settings'
-                : location.pathname.startsWith('/notifications')
-                  ? 'notifications'
-                  : location.pathname.startsWith('/photos')
-                    ? location.state?.background?.startsWith('/gallery')
-                        ? 'gallery'
-                        : location.state?.background?.startsWith('/favorites')
-                          ? 'favorites'
-                          : location.state?.background?.startsWith('/trash')
-                            ? 'trash'
-                            : 'timeline'
-                    : 'timeline';
+          : location.pathname.startsWith('/albums')
+            ? 'albums'
+            : location.pathname.startsWith('/trash')
+              ? 'trash'
+              : location.pathname.startsWith('/places')
+                ? 'places'
+                : location.pathname.startsWith('/settings')
+                  ? 'settings'
+                  : location.pathname.startsWith('/notifications')
+                    ? 'notifications'
+                    : location.pathname.startsWith('/photos')
+                      ? location.state?.background?.startsWith('/gallery')
+                          ? 'gallery'
+                          : location.state?.background?.startsWith('/favorites')
+                            ? 'favorites'
+                            : location.state?.background?.startsWith('/albums')
+                              ? 'albums'
+                              : location.state?.background?.startsWith('/trash')
+                                ? 'trash'
+                                : 'timeline'
+                      : 'timeline';
 
     const { toast } = useToast();
 
@@ -151,6 +156,7 @@ const AdminPage = () => {
                         {activeTab === 'gallery' && <ImageManager />}
                         {activeTab === 'timeline' && <TimelineView />}
                         {activeTab === 'favorites' && <FavoritesView />}
+                        {activeTab === 'albums' && <AlbumsView />}
                         {activeTab === 'trash' && <TrashView />}
                         {activeTab === 'places' && <PlacesView />}
                         {activeTab === 'settings' && <FolderSettings />}

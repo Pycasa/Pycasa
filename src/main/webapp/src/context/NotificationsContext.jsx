@@ -57,6 +57,8 @@ export const NotificationsProvider = ({ children }) => {
                         processed_files: ai.processed_files || ai.analysed,
                         total_files: ai.total_files || ai.total,
                         current_file: ai.current_file || '',
+                        db_total: ai.db_total || 0,
+                        db_analysed: ai.db_analysed || 0,
                     });
                 } catch (e) {
                     console.error('Failed to fetch initial AI status:', e);
@@ -115,26 +117,32 @@ export const NotificationsProvider = ({ children }) => {
         } else if (event.type === 'scan:folder:error' || event.type === 'scan:folder:cancelled') {
             // No-op for scanStatus; handled below in liveProgress cleanup
         } else if (event.type === 'ai:started') {
-            setAiStatus({
+            setAiStatus((prev) => ({
                 is_running: true,
                 processed_files: 0,
                 total_files: event.payload.total || 0,
                 current_file: '',
-            });
+                db_total: event.payload.db_total ?? prev.db_total ?? 0,
+                db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
+            }));
         } else if (event.type === 'ai:progress') {
-            setAiStatus({
+            setAiStatus((prev) => ({
                 is_running: true,
                 processed_files: event.payload.analysed,
                 total_files: event.payload.total,
                 current_file: event.payload.current_file || '',
-            });
+                db_total: event.payload.db_total ?? prev.db_total ?? 0,
+                db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
+            }));
         } else if (event.type === 'ai:completed' || event.type === 'ai:error') {
-            setAiStatus({
+            setAiStatus((prev) => ({
                 is_running: false,
                 processed_files: 0,
                 total_files: 0,
                 current_file: '',
-            });
+                db_total: event.payload.db_total ?? prev.db_total ?? 0,
+                db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
+            }));
         }
 
         if (PROGRESS_TYPES.has(event.type)) {

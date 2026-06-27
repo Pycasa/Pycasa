@@ -11,10 +11,10 @@ import threading
 from typing import Set, Dict, List, Optional
 from fastapi import WebSocket
 import httpx
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from PIL.ExifTags import TAGS, GPSTAGS
 
-from .database import get_db, DB_DIR
+from .database import get_db, DB_DIR, log_event
 
 logger = logging.getLogger("pycasa.services")
 
@@ -215,6 +215,7 @@ class FolderScanService:
 
         try:
             with Image.open(file_path) as img:
+                img = ImageOps.exif_transpose(img)
                 metadata["width"] = img.width
                 metadata["height"] = img.height
 
@@ -445,6 +446,9 @@ class FolderScanService:
                     )
                 )
 
+            if not existing:
+                log_event("file:indexed", file_path=file_path, details="Discovered and indexed new image during folder scan")
+
             # Throttle WS updates to 500ms
             now = time.time()
             if now - state.last_broadcast > 0.5:
@@ -497,6 +501,17 @@ class AiService:
         self.lock = threading.Lock()
 
     def get_analysis_status(self) -> dict:
+        db_total = 0
+        db_analysed = 0
+        try:
+            with get_db() as conn:
+                cursor_total = conn.execute("SELECT COUNT(*) as count FROM images WHERE trashed = 0")
+                db_total = cursor_total.fetchone()["count"]
+                cursor_analysed = conn.execute("SELECT COUNT(*) as count FROM images WHERE ai_analysed = 1 AND trashed = 0")
+                db_analysed = cursor_analysed.fetchone()["count"]
+        except Exception as e:
+            logger.warning(f"Failed to query overall AI stats: {e}")
+
         with self.lock:
             return {
                 "running": self.analysing,
@@ -506,8 +521,20 @@ class AiService:
                 "total": self.total,
                 "total_files": self.total,
                 "status": self.current_status,
-                "current_file": self.current_file
+                "current_file": self.current_file,
+                "db_total": db_total,
+                "db_analysed": db_analysed
             }
+
+    def _get_db_stats(self) -> tuple:
+        try:
+            with get_db() as conn:
+                total = conn.execute("SELECT COUNT(*) as count FROM images WHERE trashed = 0").fetchone()["count"]
+                analysed = conn.execute("SELECT COUNT(*) as count FROM images WHERE ai_analysed = 1 AND trashed = 0").fetchone()["count"]
+                return total, analysed
+        except Exception as e:
+            logger.warning(f"Failed to query database stats: {e}")
+            return 0, 0
 
     def trigger_batch_analysis(self, rerun: bool):
         with self.lock:
@@ -532,12 +559,15 @@ class AiService:
                 self.total = len(images)
                 self.analysed = 0
 
+            db_total, db_analysed = self._get_db_stats()
             notification_service.broadcast(
                 "ai:started",
                 {
                     "message": "AI analysis started",
                     "total": len(images),
-                    "rerun": rerun
+                    "rerun": rerun,
+                    "db_total": db_total,
+                    "db_analysed": db_analysed
                 }
             )
 
@@ -553,12 +583,15 @@ class AiService:
                 with self.lock:
                     self.current_file = filename
 
+                db_total, db_analysed = self._get_db_stats()
                 notification_service.broadcast(
                     "ai:progress",
                     {
                         "analysed": self.analysed,
                         "total": self.total,
-                        "current_file": filename
+                        "current_file": filename,
+                        "db_total": db_total,
+                        "db_analysed": db_analysed
                     }
                 )
 
@@ -578,12 +611,15 @@ class AiService:
                     self.analysed += 1
                     done = self.analysed
 
+                db_total, db_analysed = self._get_db_stats()
                 notification_service.broadcast(
                     "ai:progress",
                     {
                         "analysed": done,
                         "total": self.total,
-                        "current_file": filename
+                        "current_file": filename,
+                        "db_total": db_total,
+                        "db_analysed": db_analysed
                     }
                 )
 
@@ -591,12 +627,15 @@ class AiService:
                 self.current_status = "completed"
                 done = self.analysed
 
+            db_total, db_analysed = self._get_db_stats()
             notification_service.broadcast(
                 "ai:completed",
                 {
                     "message": "AI analysis complete",
                     "analysed": done,
-                    "total": self.total
+                    "total": self.total,
+                    "db_total": db_total,
+                    "db_analysed": db_analysed
                 }
             )
         except Exception as e:
@@ -643,6 +682,7 @@ class AiService:
         description_prompt = settings["image_analysis_prompt"] or "Describe this image in detail. Focus on the subjects, setting, colors, mood, and any notable elements."
 
         with Image.open(file_path) as img:
+            img = ImageOps.exif_transpose(img)
             buf = io.BytesIO()
             img.convert("RGB").save(buf, format="JPEG", quality=90)
             img_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
@@ -695,6 +735,7 @@ class AiService:
                     "INSERT OR IGNORE INTO image_tags (image_id, tag) VALUES (?, ?)",
                     (img_id, tag)
                 )
+        log_event("ai:analysed", file_path=file_path, details=f"Completed AI analysis using vision model '{vision_model}' and text model '{text_model}' (generated description and {len(tags)} tags)")
 
     def _parse_tags(self, response_text: str) -> List[str]:
         raw = response_text.strip()

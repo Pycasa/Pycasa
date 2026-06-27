@@ -34,12 +34,17 @@ class FolderResponse(BaseModel):
     createdAt: int # camelCase for React compatibility
     imageCount: int = 0
 
+class AlbumInfo(BaseModel):
+    id: str
+    name: str
+
 class ImageRecordResponse(BaseModel):
     id: str
     file_path: str
     folder_id: str
     description: Optional[str] = None
     tags: List[str] = []
+    albums: List[AlbumInfo] = []
     ocr_text: Optional[str] = None
     file_size: int
     modified_at: int
@@ -98,3 +103,19 @@ class NotificationResponse(BaseModel):
     detail: Optional[str] = None
     ts: int
     read: bool
+
+class CreateAlbumRequest(BaseModel):
+    name: str
+
+class AlbumResponse(BaseModel):
+    id: str
+    name: str
+    created_at: int
+    image_count: int = 0
+    cover_image_thumbnail: Optional[str] = None
+
+class AddAlbumImagesRequest(BaseModel):
+    image_ids: List[str]
+
+class RemoveAlbumImagesRequest(BaseModel):
+    image_ids: List[str]

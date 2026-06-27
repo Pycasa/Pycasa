@@ -9,6 +9,7 @@ import {
     LogOut,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     FolderHeart,
     Server,
     Heart,
@@ -26,18 +27,49 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { unreadCount } = useNotifications();
+    const { unreadCount, aiStatus } = useNotifications();
     const [isCollapsed, setIsCollapsed] = useState(() => {
         const saved = localStorage.getItem('sidebar-collapsed');
         return saved === 'true';
     });
     const [folders, setFolders] = useState([]);
+    const [albums, setAlbums] = useState([]);
+    const [isAlbumsExpanded, setIsAlbumsExpanded] = useState(true);
     const [dbSizeStr, setDbSizeStr] = useState('1.2 GB');
     const [dbSizePercent, setDbSizePercent] = useState(12);
+    const [localAIStatus, setLocalAIStatus] = useState(null);
+
+    useEffect(() => {
+        const updateStats = async () => {
+            try {
+                const ai = await api.ai.getAnalysisStatus();
+                setLocalAIStatus({
+                    is_running: ai.is_running || ai.running,
+                    db_total: ai.db_total || 0,
+                    db_analysed: ai.db_analysed || 0,
+                });
+            } catch (err) {
+                console.error('Failed to refresh AI status:', err);
+            }
+        };
+
+        updateStats();
+        const interval = setInterval(updateStats, 3000);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         localStorage.setItem('sidebar-collapsed', isCollapsed);
     }, [isCollapsed]);
+
+    const fetchAlbums = async () => {
+        try {
+            const data = await api.albums.list();
+            setAlbums(data || []);
+        } catch (err) {
+            console.error('Failed to load albums in sidebar:', err);
+        }
+    };
 
     useEffect(() => {
         const fetchFolders = async () => {
@@ -62,6 +94,10 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
             }
         };
         fetchFolders();
+        fetchAlbums();
+
+        window.addEventListener('pycasa-albums-updated', fetchAlbums);
+        return () => window.removeEventListener('pycasa-albums-updated', fetchAlbums);
     }, []);
 
     // Main Section items
@@ -72,7 +108,6 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
 
     // Library Section items (matches modern)
     const libraryNavItems = [
-        { id: 'favorites', label: 'Favorites', icon: Heart, path: '/favorites' },
         { id: 'places', label: 'Places', icon: MapPin, path: '/places' },
         { id: 'trash', label: 'Trash', icon: Trash2, path: '/trash' },
     ];
@@ -167,6 +202,145 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                         </p>
                     )}
                     <nav className="space-y-0.5">
+                        {/* Favorites (always first in Library) */}
+                        {(() => {
+                            const isActive = activeTab === 'favorites';
+                            const content = (
+                                <button
+                                    onClick={() => {
+                                        navigate('/favorites');
+                                        if (onItemClick) onItemClick();
+                                    }}
+                                    className={`w-full flex items-center gap-3 py-2 px-3 rounded-xl text-[14px] font-medium transition-all duration-150 ${
+                                        isActive
+                                            ? 'bg-slate-200/60 text-slate-900 dark:bg-white/10 dark:text-white'
+                                            : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/[0.06]'
+                                    }`}
+                                >
+                                    <Heart
+                                        className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
+                                    />
+                                    {!isCollapsed && <span className="truncate">Favorites</span>}
+                                </button>
+                            );
+
+                            if (isCollapsed) {
+                                return (
+                                    <Tooltip key="favorites" delayDuration={100}>
+                                        <TooltipTrigger asChild>{content}</TooltipTrigger>
+                                        <TooltipContent
+                                            side="right"
+                                            className="text-xs bg-zinc-900 border-zinc-800 text-white shadow-xl"
+                                        >
+                                            Favorites
+                                        </TooltipContent>
+                                    </Tooltip>
+                                );
+                            }
+
+                            return <div key="favorites">{content}</div>;
+                        })()}
+
+                        {/* Albums (Expandable Section) */}
+                        {(() => {
+                            const isActive = activeTab === 'albums';
+                            const content = (
+                                <div className="w-full">
+                                    <button
+                                        onClick={() => {
+                                            navigate('/albums');
+                                            if (onItemClick) onItemClick();
+                                        }}
+                                        className={`w-full flex items-center justify-between py-2 px-3 rounded-xl text-[14px] font-medium transition-all duration-150 ${
+                                            isActive
+                                                ? 'bg-slate-200/60 text-slate-900 dark:bg-white/10 dark:text-white'
+                                                : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/[0.06]'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <FolderClosed
+                                                className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
+                                            />
+                                            {!isCollapsed && (
+                                                <span className="truncate">Albums</span>
+                                            )}
+                                        </div>
+                                        {!isCollapsed && (
+                                            <span
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setIsAlbumsExpanded(!isAlbumsExpanded);
+                                                }}
+                                                className="p-0.5 hover:bg-slate-300/50 dark:hover:bg-white/10 rounded transition-colors"
+                                            >
+                                                {isAlbumsExpanded ? (
+                                                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                                                ) : (
+                                                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                                                )}
+                                            </span>
+                                        )}
+                                    </button>
+
+                                    {/* Sub-albums list */}
+                                    {!isCollapsed && isAlbumsExpanded && albums.length > 0 && (
+                                        <div className="pl-6 pr-2 py-1 space-y-0.5">
+                                            {albums.map((album) => {
+                                                const isAlbumActive =
+                                                    location.pathname === `/albums/${album.id}`;
+                                                return (
+                                                    <button
+                                                        key={album.id}
+                                                        onClick={() => {
+                                                            navigate(`/albums/${album.id}`);
+                                                            if (onItemClick) onItemClick();
+                                                        }}
+                                                        className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+                                                            isAlbumActive
+                                                                ? 'bg-slate-200/40 text-slate-900 dark:bg-white/5 dark:text-white'
+                                                                : 'text-slate-500 dark:text-white/50 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200/30 dark:hover:bg-white/[0.03]'
+                                                        }`}
+                                                    >
+                                                        {album.cover_image_thumbnail ? (
+                                                            <img
+                                                                src={api.images.getThumbnail(
+                                                                    album.cover_image_thumbnail
+                                                                )}
+                                                                alt=""
+                                                                className="w-4 h-4 rounded object-cover shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <FolderClosed className="w-3.5 h-3.5 text-slate-400 dark:text-white/30 shrink-0" />
+                                                        )}
+                                                        <span className="truncate text-left flex-1">
+                                                            {album.name}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+
+                            if (isCollapsed) {
+                                return (
+                                    <Tooltip key="albums" delayDuration={100}>
+                                        <TooltipTrigger asChild>{content}</TooltipTrigger>
+                                        <TooltipContent
+                                            side="right"
+                                            className="text-xs bg-zinc-900 border-zinc-800 text-white shadow-xl"
+                                        >
+                                            Albums
+                                        </TooltipContent>
+                                    </Tooltip>
+                                );
+                            }
+
+                            return <div key="albums">{content}</div>;
+                        })()}
+
+                        {/* Other Library Items (Places, Trash) */}
                         {libraryNavItems.map((item) => {
                             const isActive = activeTab === item.id;
                             const Icon = item.icon;
@@ -210,44 +384,60 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                 </div>
             </div>
 
-            {/* Sidebar Bottom Section: Settings + Storage & Version */}
+            {/* Sidebar Bottom Section: Storage & Version */}
             <div className="p-3 border-t border-slate-200 dark:border-white/[0.06] space-y-2 shrink-0">
-                {/* Settings nav button */}
-                {(() => {
-                    const isActive = activeTab === 'settings';
-                    const content = (
-                        <button
-                            onClick={() => {
-                                navigate('/settings');
-                                if (onItemClick) onItemClick();
-                            }}
-                            className={`w-full flex items-center gap-3 py-2 px-3 rounded-xl text-[14px] font-medium transition-all duration-150 ${
-                                isActive
-                                    ? 'bg-slate-200/60 text-slate-900 dark:bg-white/10 dark:text-white'
-                                    : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/[0.06]'
-                            }`}
+                {/* AI Analysis Widget Card */}
+                {!isCollapsed && (
+                    <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                            <div className="bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.06] cursor-help transition-colors hover:bg-slate-200/50 dark:hover:bg-white/[0.08]">
+                                <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">
+                                    <span>AI Analysis</span>
+                                    <span className="tabular-nums font-medium text-slate-500 dark:text-white/60">
+                                        {localAIStatus?.db_analysed || 0} of{' '}
+                                        {localAIStatus?.db_total || 0}
+                                    </span>
+                                </div>
+                                {(() => {
+                                    const total = localAIStatus?.db_total || 0;
+                                    const analysed = localAIStatus?.db_analysed || 0;
+                                    const percent =
+                                        total > 0 ? Math.round((analysed / total) * 100) : 0;
+                                    return (
+                                        <>
+                                            <div className="w-full bg-slate-200 dark:bg-white/10 h-1 rounded-full overflow-hidden mb-2">
+                                                <div
+                                                    className="bg-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
+                                                    style={{ width: `${percent}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-white/45">
+                                                <span>{percent}% analysed</span>
+                                                {localAIStatus?.is_running && (
+                                                    <span className="text-indigo-500 dark:text-indigo-400 animate-pulse font-medium">
+                                                        Analyzing...
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                            side="right"
+                            align="center"
+                            className="max-w-xs text-xs bg-zinc-900 border-zinc-800 text-white shadow-xl p-3 space-y-1"
                         >
-                            <Settings
-                                className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
-                            />
-                            {!isCollapsed && <span className="truncate">Settings</span>}
-                        </button>
-                    );
-                    if (isCollapsed) {
-                        return (
-                            <Tooltip delayDuration={100}>
-                                <TooltipTrigger asChild>{content}</TooltipTrigger>
-                                <TooltipContent
-                                    side="right"
-                                    className="text-xs bg-zinc-900 border-zinc-800 text-white shadow-xl"
-                                >
-                                    Settings
-                                </TooltipContent>
-                            </Tooltip>
-                        );
-                    }
-                    return content;
-                })()}
+                            <p className="font-semibold text-indigo-400">AI Metadata Indexing</p>
+                            <p className="text-zinc-300 leading-relaxed">
+                                Shows the proportion of images in your library processed by the
+                                local AI vision model. AI analysis generates descriptions and tags
+                                to enable smart search and filtering.
+                            </p>
+                        </TooltipContent>
+                    </Tooltip>
+                )}
 
                 {/* Storage Widget Card (modern style) */}
                 {!isCollapsed && (
@@ -267,18 +457,6 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                         </div>
                     </div>
                 )}
-
-                {/* Server Online Status Info Bar */}
-                <div className="flex items-center justify-between text-[11px] font-medium text-slate-400/80 dark:text-white/30 px-1 select-none">
-                    <div className="flex items-center gap-2">
-                        <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                        </span>
-                        <span>Server Online</span>
-                    </div>
-                    {!isCollapsed && <span className="opacity-60">v1.0.0</span>}
-                </div>
             </div>
         </aside>
     );

@@ -31,7 +31,7 @@ COPY server/ ./server/
 COPY --from=builder /app/src/main/webapp/dist ./src/main/webapp/dist
 
 # Expose app port
-EXPOSE 3001
+EXPOSE 3000
 
 # Run FastAPI app
-CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "3001"]
+CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "3000"]

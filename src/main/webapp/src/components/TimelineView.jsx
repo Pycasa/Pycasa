@@ -610,21 +610,52 @@ const TimelineView = () => {
                         key: `${year}-${month}-${day}`,
                     });
                     const slots = groupedSlots[year][month][day];
-                    for (let i = 0; i < slots.length; i += colCount) {
+                    const targetAspect = colCount * 1.35; // target sum of aspect ratios for one row
+
+                    let currentRow = [];
+                    let currentAspect = 0;
+                    let rowIndex = 0;
+
+                    slots.forEach((slot) => {
+                        const img = images[slot.index];
+                        const aspect =
+                            img && img.width && img.height ? img.width / img.height : 1.4;
+
+                        currentRow.push(slot);
+                        currentAspect += aspect;
+
+                        // If we reached or exceeded the target aspect ratio, complete the row
+                        if (currentAspect >= targetAspect) {
+                            rows.push({
+                                type: 'image-row',
+                                year: +year,
+                                month: +month,
+                                day: +day,
+                                slots: currentRow,
+                                key: `${year}-${month}-${day}-r${rowIndex}`,
+                            });
+                            currentRow = [];
+                            currentAspect = 0;
+                            rowIndex++;
+                        }
+                    });
+
+                    // Push any remaining images in the last row of the day
+                    if (currentRow.length > 0) {
                         rows.push({
                             type: 'image-row',
                             year: +year,
                             month: +month,
                             day: +day,
-                            slots: slots.slice(i, i + colCount),
-                            key: `${year}-${month}-${day}-r${i}`,
+                            slots: currentRow,
+                            key: `${year}-${month}-${day}-r${rowIndex}`,
                         });
                     }
                 });
             });
         });
         return rows;
-    }, [groupedSlots, years, colCount]);
+    }, [groupedSlots, years, colCount, images]);
 
     /** Fast lookup: "year-month" or "year-month-day" → flat row index (for scrollToIndex) */
     const monthKeyToIndex = useMemo(() => {
@@ -855,6 +886,13 @@ const TimelineView = () => {
                                                                 />
                                                             );
                                                         })}
+                                                        <div
+                                                            className="flex-grow-[100000] shrink"
+                                                            style={{
+                                                                flexBasis: '0px',
+                                                                height: '0px',
+                                                            }}
+                                                        />
                                                     </div>
                                                 </div>
                                             );

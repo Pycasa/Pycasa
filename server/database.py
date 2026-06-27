@@ -2,6 +2,8 @@ import os
 import sqlite3
 import hashlib
 import logging
+import time
+import uuid
 from contextlib import contextmanager
 
 DB_DIR = os.path.expanduser("~/.pycasa/cache")
@@ -123,6 +125,26 @@ def init_db():
         );
         """)
 
+        # Create Albums table
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS albums (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE,
+            created_at INTEGER
+        );
+        """)
+
+        # Create Album Images table
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS album_images (
+            album_id TEXT,
+            image_id TEXT,
+            PRIMARY KEY (album_id, image_id),
+            FOREIGN KEY(album_id) REFERENCES albums(id) ON DELETE CASCADE,
+            FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+        );
+        """)
+
         # Create Notifications table
         conn.execute("""
         CREATE TABLE IF NOT EXISTS notifications (
@@ -135,12 +157,26 @@ def init_db():
         );
         """)
 
+        # Create Events table
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id TEXT PRIMARY KEY,
+            event_type TEXT,
+            timestamp INTEGER,
+            file_path TEXT,
+            folder_path TEXT,
+            details TEXT
+        );
+        """)
+
         # Create Indexes
         conn.execute("CREATE INDEX IF NOT EXISTS idx_images_modified_at ON images (modified_at DESC);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_images_folder_id_modified_at ON images (folder_id, modified_at DESC);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_images_favorite_modified_at ON images (favorite, modified_at DESC);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_images_file_path ON images (file_path);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_tag ON image_tags (tag);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events (timestamp DESC);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_album_images_album_id ON album_images (album_id);")
 
         # Bootstrap Admin User
         cursor = conn.execute("SELECT COUNT(*) as count FROM users")
@@ -208,3 +244,29 @@ def init_db():
                 logger.info(f"Migrated database: added {col} column to images table")
             except sqlite3.OperationalError:
                 pass
+
+        # Backfill folder_path for events
+        try:
+            cursor = conn.execute("SELECT id, file_path FROM events WHERE folder_path IS NULL OR folder_path = ''")
+            rows = cursor.fetchall()
+            for r in rows:
+                if r["file_path"]:
+                    dir_path = os.path.dirname(r["file_path"])
+                    conn.execute("UPDATE events SET folder_path = ? WHERE id = ?", (dir_path, r["id"]))
+        except Exception as e:
+            pass
+
+
+def log_event(event_type: str, file_path: str = None, folder_path: str = None, details: str = None):
+    try:
+        if not folder_path and file_path:
+            folder_path = os.path.dirname(file_path)
+        event_id = "ev_" + uuid.uuid4().hex
+        ts = int(time.time() * 1000)
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO events (id, event_type, timestamp, file_path, folder_path, details) VALUES (?, ?, ?, ?, ?, ?)",
+                (event_id, event_type, ts, file_path, folder_path, details)
+            )
+    except Exception as e:
+        logger.warning(f"Failed to log event '{event_type}': {e}")

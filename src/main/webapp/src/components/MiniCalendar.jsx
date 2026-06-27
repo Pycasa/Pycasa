@@ -60,16 +60,16 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
             <div className="flex items-center justify-between px-1 pb-2">
                 <button
                     onClick={() => setViewMonth((m) => subMonths(m, 1))}
-                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/50 transition-colors"
                 >
                     <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <span className="text-xs font-semibold text-slate-700 dark:text-white/80">
                     {format(viewMonth, 'MMMM yyyy')}
                 </span>
                 <button
                     onClick={() => setViewMonth((m) => addMonths(m, 1))}
-                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/50 transition-colors"
                 >
                     <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -80,7 +80,7 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
                 {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => (
                     <div
                         key={d}
-                        className="text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 py-0.5"
+                        className="text-center text-[10px] font-bold text-slate-400 dark:text-white/30 py-0.5"
                     >
                         {d}
                     </div>
@@ -107,8 +107,8 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
                                     : todayDay && !outside
                                       ? 'bg-primary/10 text-primary font-semibold dark:bg-primary/20'
                                       : outside
-                                        ? 'text-slate-300 dark:text-slate-600'
-                                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700',
+                                        ? 'text-slate-300 dark:text-white/20'
+                                        : 'text-slate-700 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10',
                                 disabled && !sel
                                     ? 'opacity-30 cursor-not-allowed'
                                     : 'cursor-pointer',
@@ -121,7 +121,7 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
             </div>
 
             {/* Today / Clear actions */}
-            <div className="flex justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <div className="flex justify-between mt-2 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
                 <button
                     onClick={() => {
                         const t = format(today, 'yyyy-MM-dd');

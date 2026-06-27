@@ -19,6 +19,7 @@ import {
     ClipboardCopy,
     Image as ImageIcon,
     Folder as FolderIcon,
+    FolderClosed,
     Loader2,
     ArrowLeft,
     Camera,
@@ -30,6 +31,7 @@ import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 import { formatFileSize } from '@/lib/utils';
 import { useAIStatus } from '@/context/AIStatusContext';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 /* ─── Toolbar icon button — matches modern's ActionButton style ────── */
 const ToolBtn = ({ icon: Icon, label, onClick, active, danger, disabled, className = '' }) => (
@@ -110,6 +112,10 @@ const ImageDetailModal = ({
     const [showInfo, setShowInfo] = useState(false);
     const [isFavourite, setIsFavourite] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
+    const [albums, setAlbums] = useState([]);
+    const [allAlbums, setAllAlbums] = useState([]);
+    const [newAlbumName, setNewAlbumName] = useState('');
+    const [isAddingAlbum, setIsAddingAlbum] = useState(false);
 
     // Pan & zoom
     const [scale, setScale] = useState(1);
@@ -144,6 +150,7 @@ const ImageDetailModal = ({
         if (!image) return;
         setDescription(image.description || '');
         setTags(image.tags || []);
+        setAlbums(image.albums || []);
         setEmbeddings(image.embeddings || null);
         setIsFavourite(image.favorite || false);
         resetZoom();
@@ -152,10 +159,80 @@ const ImageDetailModal = ({
         if (isOpen) {
             api.images
                 .getDetails(image.full_path)
-                .then(setDetails)
+                .then((data) => {
+                    setDetails(data);
+                    if (data?.albums) {
+                        setAlbums(data.albums);
+                    }
+                })
                 .catch(() => {});
         }
     }, [image?.id, image?.full_path, isOpen]);
+
+    const fetchAllAlbums = async () => {
+        try {
+            const data = await api.albums.list();
+            setAllAlbums(data || []);
+        } catch (err) {
+            console.error('Failed to fetch all albums:', err);
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchAllAlbums();
+        }
+    }, [isOpen]);
+
+    const handleAddToAlbum = async (albumId) => {
+        if (!image?.id) return;
+        try {
+            await api.albums.addImages(albumId, [image.id]);
+            toast({ title: 'Added to album' });
+            const albumInfo = allAlbums.find((a) => a.id === albumId);
+            if (albumInfo && !albums.some((a) => a.id === albumId)) {
+                setAlbums((prev) => [...prev, { id: albumInfo.id, name: albumInfo.name }]);
+            }
+            if (onUpdate) onUpdate();
+            window.dispatchEvent(new CustomEvent('pycasa-albums-updated'));
+        } catch (err) {
+            toast({ title: 'Failed to add to album', variant: 'destructive' });
+        }
+    };
+
+    const handleRemoveFromAlbum = async (albumId) => {
+        if (!image?.id) return;
+        try {
+            await api.albums.removeImages(albumId, [image.id]);
+            toast({ title: 'Removed from album' });
+            setAlbums((prev) => prev.filter((a) => a.id !== albumId));
+            if (onUpdate) onUpdate();
+            window.dispatchEvent(new CustomEvent('pycasa-albums-updated'));
+        } catch (err) {
+            toast({ title: 'Failed to remove from album', variant: 'destructive' });
+        }
+    };
+
+    const handleCreateAndAddToAlbum = async (e) => {
+        e.preventDefault();
+        const name = newAlbumName.trim();
+        if (!name || !image?.id) return;
+        setIsAddingAlbum(true);
+        try {
+            const newAlbum = await api.albums.create(name);
+            await api.albums.addImages(newAlbum.id, [image.id]);
+            toast({ title: `Created and added to "${name}"` });
+            setNewAlbumName('');
+            setAlbums((prev) => [...prev, { id: newAlbum.id, name: newAlbum.name }]);
+            fetchAllAlbums();
+            if (onUpdate) onUpdate();
+            window.dispatchEvent(new CustomEvent('pycasa-albums-updated'));
+        } catch (err) {
+            toast({ title: err.message || 'Failed to create album', variant: 'destructive' });
+        } finally {
+            setIsAddingAlbum(false);
+        }
+    };
 
     // Handle browser cached images where onLoad might not fire
     useEffect(() => {
@@ -493,6 +570,87 @@ const ImageDetailModal = ({
                             style={isFavourite ? { fill: '#f87171', color: '#f87171' } : {}}
                         />
                     </button>
+                    {/* Add to Album popover button */}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <button
+                                title="Add to album"
+                                className="flex items-center justify-center w-10 h-10 rounded-full transition-all duration-150 text-white/70 hover:text-white hover:bg-white/10"
+                            >
+                                <FolderClosed className="w-[19px] h-[19px]" strokeWidth={1.8} />
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-60 p-3 bg-zinc-950 border-zinc-800 text-white shadow-xl rounded-xl space-y-3 z-50">
+                            <div className="space-y-1">
+                                <p className="text-xs font-semibold text-zinc-400">Add to Album</p>
+                                <div className="max-h-32 overflow-y-auto space-y-1 no-scrollbar">
+                                    {allAlbums.length > 0 ? (
+                                        allAlbums.map((album) => {
+                                            const inAlbum = albums.some((a) => a.id === album.id);
+                                            return (
+                                                <div
+                                                    key={album.id}
+                                                    className="flex items-center justify-between px-2 py-1 rounded text-xs hover:bg-white/5 text-zinc-200 transition-colors"
+                                                >
+                                                    <span className="truncate flex-1 pr-2">
+                                                        {album.name}
+                                                    </span>
+                                                    {inAlbum ? (
+                                                        <button
+                                                            onClick={() =>
+                                                                handleRemoveFromAlbum(album.id)
+                                                            }
+                                                            className="text-red-400 hover:text-red-500 p-1 rounded transition-colors shrink-0 hover:bg-red-500/10"
+                                                            title="Remove from album"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() =>
+                                                                handleAddToAlbum(album.id)
+                                                            }
+                                                            className="text-indigo-400 hover:text-indigo-300 p-1 rounded transition-colors shrink-0 hover:bg-indigo-500/10"
+                                                            title="Add to album"
+                                                        >
+                                                            <Plus className="w-3 h-3" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <p className="text-[10px] text-zinc-500 py-2 text-center">
+                                            No albums yet
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="border-t border-white/10 pt-2.5">
+                                <form onSubmit={handleCreateAndAddToAlbum} className="space-y-1.5">
+                                    <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                                        New Album
+                                    </p>
+                                    <div className="flex gap-1">
+                                        <input
+                                            value={newAlbumName}
+                                            onChange={(e) => setNewAlbumName(e.target.value)}
+                                            placeholder="Album name..."
+                                            className="flex-1 min-w-0 bg-white/[0.05] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500"
+                                            disabled={isAddingAlbum}
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={isAddingAlbum || !newAlbumName.trim()}
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white p-1 rounded disabled:opacity-50"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                     {/* AI analysis status — subtle non-interactive icon beside heart */}
                     <span
                         title={
@@ -698,6 +856,137 @@ const ImageDetailModal = ({
                                     </div>
                                 ) : (
                                     <p className="text-sm text-gray-600 pt-1">No tags yet</p>
+                                )}
+                            </div>
+
+                            {/* Albums section */}
+                            <div className="mt-4 px-4 border-t border-white/[0.08] pt-4">
+                                <SectionHeader
+                                    action={
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <button
+                                                    className="flex items-center justify-center w-8 h-8 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                                                    aria-label="Add to album"
+                                                >
+                                                    <Plus className="w-4 h-4" strokeWidth={1.8} />
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-60 p-3 bg-zinc-950 border-zinc-800 text-white shadow-xl rounded-xl space-y-3 z-50">
+                                                <div className="space-y-1">
+                                                    <p className="text-xs font-semibold text-zinc-400">
+                                                        Add to Album
+                                                    </p>
+                                                    <div className="max-h-32 overflow-y-auto space-y-1 no-scrollbar">
+                                                        {allAlbums.length > 0 ? (
+                                                            allAlbums.map((album) => {
+                                                                const inAlbum = albums.some(
+                                                                    (a) => a.id === album.id
+                                                                );
+                                                                return (
+                                                                    <div
+                                                                        key={album.id}
+                                                                        className="flex items-center justify-between px-2 py-1 rounded text-xs hover:bg-white/5 text-zinc-200 transition-colors"
+                                                                    >
+                                                                        <span className="truncate flex-1 pr-2">
+                                                                            {album.name}
+                                                                        </span>
+                                                                        {inAlbum ? (
+                                                                            <button
+                                                                                onClick={() =>
+                                                                                    handleRemoveFromAlbum(
+                                                                                        album.id
+                                                                                    )
+                                                                                }
+                                                                                className="text-red-400 hover:text-red-500 p-1 rounded transition-colors shrink-0 hover:bg-red-500/10"
+                                                                                title="Remove from album"
+                                                                            >
+                                                                                <X className="w-3 h-3" />
+                                                                            </button>
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={() =>
+                                                                                    handleAddToAlbum(
+                                                                                        album.id
+                                                                                    )
+                                                                                }
+                                                                                className="text-indigo-400 hover:text-indigo-300 p-1 rounded transition-colors shrink-0 hover:bg-indigo-500/10"
+                                                                                title="Add to album"
+                                                                            >
+                                                                                <Plus className="w-3 h-3" />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        ) : (
+                                                            <p className="text-[10px] text-zinc-500 py-2 text-center">
+                                                                No albums yet
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="border-t border-white/10 pt-2.5">
+                                                    <form
+                                                        onSubmit={handleCreateAndAddToAlbum}
+                                                        className="space-y-1.5"
+                                                    >
+                                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                                                            New Album
+                                                        </p>
+                                                        <div className="flex gap-1">
+                                                            <input
+                                                                value={newAlbumName}
+                                                                onChange={(e) =>
+                                                                    setNewAlbumName(e.target.value)
+                                                                }
+                                                                placeholder="Album name..."
+                                                                className="flex-1 min-w-0 bg-white/[0.05] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500"
+                                                                disabled={isAddingAlbum}
+                                                            />
+                                                            <button
+                                                                type="submit"
+                                                                disabled={
+                                                                    isAddingAlbum ||
+                                                                    !newAlbumName.trim()
+                                                                }
+                                                                className="bg-indigo-600 hover:bg-indigo-700 text-white p-1 rounded disabled:opacity-50"
+                                                            >
+                                                                <Plus className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
+                                    }
+                                >
+                                    Albums
+                                </SectionHeader>
+
+                                {albums.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1 pt-2">
+                                        {albums.map((album) => (
+                                            <span
+                                                key={album.id}
+                                                className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.06] px-3 py-0.5 text-sm font-light text-gray-200"
+                                            >
+                                                <FolderClosed className="w-3 h-3 text-zinc-400" />
+                                                {album.name}
+                                                <button
+                                                    onClick={() => handleRemoveFromAlbum(album.id)}
+                                                    className="ml-1 text-gray-500 hover:text-white transition-colors"
+                                                    aria-label={`Remove from album ${album.name}`}
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-600 pt-1 font-light">
+                                        Not in any albums
+                                    </p>
                                 )}
                             </div>
 

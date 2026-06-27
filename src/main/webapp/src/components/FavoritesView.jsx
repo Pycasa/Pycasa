@@ -137,6 +137,10 @@ const FavoritesView = () => {
                                 onFavoriteToggle={handleFavoriteToggle}
                             />
                         ))}
+                        <div
+                            className="flex-grow-[100000] shrink"
+                            style={{ flexBasis: '0px', height: '0px' }}
+                        />
                     </div>
                 </div>
             )}

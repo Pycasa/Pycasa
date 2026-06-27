@@ -299,13 +299,13 @@ const ImageManager = () => {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900 overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50 dark:bg-[#09090b] overflow-hidden">
             {/* Filter Bar */}
-            <div className="bg-white dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 px-8 py-4 space-y-4 shadow-sm z-10">
+            <div className="bg-white dark:bg-[#09090b] border-b border-slate-200 dark:border-white/[0.06] px-8 py-4 space-y-4 shadow-sm z-10">
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Folder Filter */}
                     <Select value={folderId} onValueChange={setFolderId}>
-                        <SelectTrigger className="w-[180px] h-10 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600">
+                        <SelectTrigger className="w-[180px] h-10 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 dark:text-white/80">
                             <div className="flex items-center gap-2">
                                 <FolderIcon className="w-4 h-4 text-slate-400 shrink-0" />
                                 <SelectValue placeholder="All Folders" />
@@ -324,7 +324,7 @@ const ImageManager = () => {
                     {/* Sort By */}
                     <div className="flex items-center gap-1">
                         <Select value={sortBy} onValueChange={setSortBy}>
-                            <SelectTrigger className="w-[160px] h-10 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600">
+                            <SelectTrigger className="w-[160px] h-10 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 dark:text-white/80">
                                 <div className="flex items-center gap-2">
                                     <Filter className="w-4 h-4 text-slate-400 shrink-0" />
                                     <SelectValue placeholder="Sort By" />
@@ -356,7 +356,7 @@ const ImageManager = () => {
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 transition-all active:scale-95 ${dateActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${dateActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-white/60'}`}
                             >
                                 <Calendar className="w-4 h-4 mr-2" />
                                 Date
@@ -371,11 +371,11 @@ const ImageManager = () => {
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent
-                            className="w-56 p-0 shadow-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800"
+                            className="w-56 p-0 shadow-xl border-slate-200 dark:border-white/[0.08]"
                             align="start"
                         >
-                            <div className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                            <div className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.03]">
+                                <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">
                                     Date Range
                                 </span>
                                 {dateActive && (
@@ -406,7 +406,7 @@ const ImageManager = () => {
                                         onChange={setDateFrom}
                                     />
                                 </div>
-                                <div className="border-t border-slate-100 dark:border-slate-700 pt-3">
+                                <div className="border-t border-slate-100 dark:border-white/[0.06] pt-3">
                                     <span className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 block font-bold uppercase tracking-wider">
                                         To{' '}
                                         {dateTo && (
@@ -430,7 +430,7 @@ const ImageManager = () => {
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 transition-all active:scale-95 ${extActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${extActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-white/60'}`}
                             >
                                 <FileType className="w-4 h-4 mr-2" />
                                 Type
@@ -445,11 +445,11 @@ const ImageManager = () => {
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent
-                            className="w-56 p-0 shadow-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800"
+                            className="w-56 p-0 shadow-xl border-slate-200 dark:border-white/[0.08]"
                             align="start"
                         >
-                            <div className="p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex items-center justify-between">
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                            <div className="p-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.03] flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">
                                     File Type
                                 </span>
                                 {extActive && (
@@ -465,14 +465,14 @@ const ImageManager = () => {
                                 {KNOWN_EXTENSIONS.map(({ group, exts }) => (
                                     <div
                                         key={group}
-                                        className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                                        className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors cursor-pointer"
                                         onClick={() => toggleExtGroup(group)}
                                     >
                                         <Checkbox
                                             id={`ext-${group}`}
                                             checked={selectedExtGroups.includes(group)}
                                             onCheckedChange={() => toggleExtGroup(group)}
-                                            className="border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                            className="rounded border-slate-300 dark:border-white/20 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:data-[state=checked]:bg-blue-500 dark:data-[state=checked]:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"
                                         />
                                         <div className="flex-1 flex items-center justify-between">
                                             <Label
@@ -496,7 +496,7 @@ const ImageManager = () => {
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 transition-all active:scale-95 ${sizeActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${sizeActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-white/60'}`}
                             >
                                 <HardDrive className="w-4 h-4 mr-2" />
                                 Size
@@ -511,11 +511,11 @@ const ImageManager = () => {
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent
-                            className="w-52 p-0 shadow-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800"
+                            className="w-52 p-0 shadow-xl border-slate-200 dark:border-white/[0.08]"
                             align="start"
                         >
-                            <div className="p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex items-center justify-between">
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                            <div className="p-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.03] flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">
                                     File Size
                                 </span>
                                 {sizeActive && (
@@ -531,14 +531,22 @@ const ImageManager = () => {
                                 {SIZE_PRESETS.map((preset, idx) => (
                                     <div
                                         key={preset.label}
-                                        className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                                        className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors cursor-pointer"
                                         onClick={() => setSizePresetIdx(idx)}
                                     >
                                         <div
-                                            className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors ${sizePresetIdx === idx ? 'bg-primary border-primary' : 'border-slate-300 dark:border-slate-500'}`}
-                                        />
+                                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                                                sizePresetIdx === idx
+                                                    ? 'border-blue-600 dark:border-blue-500'
+                                                    : 'border-slate-300 dark:border-white/20 bg-transparent'
+                                            }`}
+                                        >
+                                            {sizePresetIdx === idx && (
+                                                <div className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-500 animate-in zoom-in-50 duration-150" />
+                                            )}
+                                        </div>
                                         <span
-                                            className={`text-xs ${sizePresetIdx === idx ? 'font-semibold text-primary' : 'text-slate-700 dark:text-slate-200'}`}
+                                            className={`text-xs ${sizePresetIdx === idx ? 'font-semibold text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'}`}
                                         >
                                             {preset.label}
                                         </span>
@@ -553,7 +561,7 @@ const ImageManager = () => {
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 transition-all active:scale-95 ${selectedTags.length > 0 ? 'border-primary text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${selectedTags.length > 0 ? 'border-primary text-primary' : 'text-slate-600 dark:text-white/60'}`}
                             >
                                 <TagIcon className="w-4 h-4 mr-2" />
                                 Tags
@@ -568,12 +576,12 @@ const ImageManager = () => {
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent
-                            className="w-64 p-0 shadow-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800"
+                            className="w-64 p-0 shadow-xl border-slate-200 dark:border-white/[0.08]"
                             align="start"
                         >
-                            <div className="p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                            <div className="p-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.03]">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                    <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">
                                         Filter by Tags
                                     </span>
                                     {selectedTags.length > 0 && (
@@ -588,7 +596,7 @@ const ImageManager = () => {
                                 <div className="relative">
                                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                                     <Input
-                                        className="h-8 pl-8 text-xs border-slate-200 dark:border-slate-600 focus:border-slate-300 focus:ring-0 transition-colors bg-white dark:bg-slate-700"
+                                        className="h-8 pl-8 text-xs bg-slate-100 dark:bg-white/[0.05] border-slate-200 dark:border-white/10 text-slate-900 dark:text-gray-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 dark:focus-visible:ring-blue-400/10 focus-visible:border-blue-500 dark:focus-visible:border-blue-400/50 transition-colors"
                                         placeholder="Search tags..."
                                         value={tagSearchQuery}
                                         onChange={(e) => setTagSearchQuery(e.target.value)}
@@ -610,7 +618,7 @@ const ImageManager = () => {
                                             .map((tag) => (
                                                 <div
                                                     key={tag}
-                                                    className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer group"
+                                                    className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors cursor-pointer group"
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         toggleTag(tag);
@@ -620,11 +628,11 @@ const ImageManager = () => {
                                                         id={`tag-${tag}`}
                                                         checked={selectedTags.includes(tag)}
                                                         onCheckedChange={() => toggleTag(tag)}
-                                                        className="border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                                        className="rounded border-slate-300 dark:border-white/20 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:data-[state=checked]:bg-blue-500 dark:data-[state=checked]:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"
                                                     />
                                                     <Label
                                                         htmlFor={`tag-${tag}`}
-                                                        className="text-xs font-medium leading-none cursor-pointer flex-grow text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors"
+                                                        className="text-xs font-medium leading-none cursor-pointer flex-grow text-slate-600 dark:text-white/70 group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
                                                     >
                                                         {tag}
                                                     </Label>
@@ -658,12 +666,12 @@ const ImageManager = () => {
                     selectedExtGroups.length > 0 ||
                     dateActive ||
                     sizeActive) && (
-                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
                         {selectedTags.map((tag) => (
                             <Badge
                                 key={tag}
                                 variant="default"
-                                className="bg-white dark:bg-slate-700 text-primary border border-primary/20 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                className="bg-white dark:bg-white/[0.07] text-primary border border-primary/20 dark:border-primary/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
                                 onClick={() => toggleTag(tag)}
                             >
                                 <TagIcon className="w-2.5 h-2.5" />
@@ -675,7 +683,7 @@ const ImageManager = () => {
                             <Badge
                                 key={group}
                                 variant="default"
-                                className="bg-white dark:bg-slate-700 text-indigo-600 border border-indigo-200 dark:border-indigo-800 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                className="bg-white dark:bg-white/[0.07] text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
                                 onClick={() => toggleExtGroup(group)}
                             >
                                 <FileType className="w-2.5 h-2.5" />
@@ -686,7 +694,7 @@ const ImageManager = () => {
                         {dateActive && (
                             <Badge
                                 variant="default"
-                                className="bg-white dark:bg-slate-700 text-amber-600 border border-amber-200 dark:border-amber-800 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                className="bg-white dark:bg-white/[0.07] text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
                                 onClick={() => {
                                     setDateFrom('');
                                     setDateTo('');
@@ -700,7 +708,7 @@ const ImageManager = () => {
                         {sizeActive && (
                             <Badge
                                 variant="default"
-                                className="bg-white dark:bg-slate-700 text-teal-600 border border-teal-200 dark:border-teal-800 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                className="bg-white dark:bg-white/[0.07] text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-500/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
                                 onClick={() => setSizePresetIdx(0)}
                             >
                                 <HardDrive className="w-2.5 h-2.5" />
@@ -732,6 +740,10 @@ const ImageManager = () => {
                                 />
                             );
                         })}
+                        <div
+                            className="flex-grow-[100000] shrink"
+                            style={{ flexBasis: '0px', height: '0px' }}
+                        />
                     </div>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400">

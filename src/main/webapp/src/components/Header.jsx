@@ -56,10 +56,10 @@ const ProfileMenu = ({ username, onLogout }) => {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: -4 }}
                         transition={{ duration: 0.12 }}
-                        className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200/60 dark:border-slate-700 overflow-hidden z-50"
+                        className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#09090b] rounded-xl shadow-lg border border-slate-200/60 dark:border-white/10 overflow-hidden z-50"
                     >
-                        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 text-center">
-                            <p className="text-xs text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">
+                        <div className="px-4 py-3 border-b border-slate-100 dark:border-white/[0.06] text-center">
+                            <p className="text-xs text-slate-400 dark:text-white/30 font-medium uppercase tracking-wider">
                                 Signed in as
                             </p>
                             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate mt-0.5">
@@ -71,7 +71,7 @@ const ProfileMenu = ({ username, onLogout }) => {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => setOpen(false)}
-                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border-b border-slate-100 dark:border-slate-700/50"
+                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-white/70 hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors border-b border-slate-100 dark:border-white/[0.06]"
                         >
                             <Database className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                             DB
@@ -81,7 +81,7 @@ const ProfileMenu = ({ username, onLogout }) => {
                                 setOpen(false);
                                 navigate('/settings');
                             }}
-                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-white/70 hover:bg-slate-50 dark:hover:bg-white/[0.06] transition-colors"
                         >
                             <Settings className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                             Settings
@@ -91,7 +91,7 @@ const ProfileMenu = ({ username, onLogout }) => {
                                 setOpen(false);
                                 onLogout();
                             }}
-                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-t border-slate-100 dark:border-slate-700"
+                            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors border-t border-slate-100 dark:border-white/[0.06]"
                         >
                             <LogOut className="w-4 h-4" />
                             Logout
@@ -194,7 +194,7 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
     const filesFound = scanStatus?.files_found || 0;
 
     return (
-        <header className="h-14 border-b border-slate-200 dark:border-white/[0.06] bg-white dark:bg-[#09090b] flex items-center justify-between px-5 z-20 shrink-0 select-none">
+        <header className="h-14 border-b border-slate-200 dark:border-white/[0.06] bg-white dark:bg-[#09090b] flex items-center justify-between px-5 z-30 shrink-0 select-none">
             {/* Left side: Hamburger (mobile) + Active Tab name */}
             <div className="flex items-center gap-3">
                 <button
@@ -207,7 +207,7 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
             </div>
 
             {/* Middle side: Central Search Bar (modern style) */}
-            <div className="flex-1 max-w-2xl mx-4 sm:mx-8">
+            <div className="flex-1 mx-2 sm:mx-4">
                 <div className="relative group">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-slate-600 dark:group-focus-within:text-slate-300 transition-colors" />
                     <input
@@ -287,7 +287,7 @@ const Header = ({ onMenuClick, title, username, onLogout }) => {
                 {/* Notifications Bell */}
                 <button
                     onClick={() => navigate('/notifications')}
-                    className={`relative w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center shrink-0 transition-colors ${
+                    className={`relative w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 flex items-center justify-center shrink-0 transition-colors ${
                         location.pathname.startsWith('/notifications')
                             ? 'text-primary bg-indigo-50/50 dark:bg-indigo-950/30'
                             : 'text-slate-500 dark:text-slate-400'

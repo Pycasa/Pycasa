@@ -180,7 +180,8 @@ class ApiClient {
             sizeMin = null,
             sizeMax = null,
             favorite = null,
-            trashed = false
+            trashed = false,
+            albumId = null
         ) => {
             const params = new URLSearchParams({
                 page,
@@ -189,6 +190,7 @@ class ApiClient {
                 sort_order: sortOrder,
             });
             if (folderId) params.append('folder_id', folderId);
+            if (albumId) params.append('album_id', albumId);
             if (search) params.append('search', search);
             if (tags && tags.length > 0) params.append('tags', tags.join(','));
             if (dateFrom) params.append('date_from', dateFrom);
@@ -239,6 +241,30 @@ class ApiClient {
             });
         },
         listGeolocated: (limit = 5000) => this.request(`/images/geolocated?limit=${limit}`),
+    };
+
+    // Albums API
+    albums = {
+        list: () => this.request('/albums'),
+        create: (name) =>
+            this.request('/albums', {
+                method: 'POST',
+                body: JSON.stringify({ name }),
+            }),
+        delete: (albumId) =>
+            this.request(`/albums/${albumId}`, {
+                method: 'DELETE',
+            }),
+        addImages: (albumId, imageIds) =>
+            this.request(`/albums/${albumId}/images`, {
+                method: 'POST',
+                body: JSON.stringify({ image_ids: imageIds }),
+            }),
+        removeImages: (albumId, imageIds) =>
+            this.request(`/albums/${albumId}/images`, {
+                method: 'DELETE',
+                body: JSON.stringify({ image_ids: imageIds }),
+            }),
     };
 
     // Settings API

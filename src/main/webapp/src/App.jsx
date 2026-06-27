@@ -29,6 +29,11 @@ function App() {
                                             <Route path="/timeline" element={<AdminPage />} />
                                             <Route path="/gallery" element={<AdminPage />} />
                                             <Route path="/favorites" element={<AdminPage />} />
+                                            <Route path="/albums" element={<AdminPage />} />
+                                            <Route
+                                                path="/albums/:albumId"
+                                                element={<AdminPage />}
+                                            />
                                             <Route path="/trash" element={<AdminPage />} />
                                             <Route path="/places" element={<AdminPage />} />
                                             <Route path="/photos/:id" element={<AdminPage />} />

@@ -78,6 +78,16 @@ class Notification(Base):
     read       = Column(Integer, default=0)
 
 
+class Event(Base):
+    __tablename__ = "events"
+    id          = Column(String, primary_key=True)
+    event_type  = Column(String)
+    timestamp   = Column(Integer)
+    file_path   = Column(String)
+    folder_path = Column(String)
+    details     = Column(Text)
+
+
 class AppSettings(Base):
     __tablename__ = "app_settings"
     id                     = Column(String, primary_key=True)
@@ -169,6 +179,19 @@ class SettingsAdmin(ModelView, model=AppSettings):
     can_edit    = True
 
 
+class EventAdmin(ModelView, model=Event):
+    name        = "Event"
+    name_plural = "Events"
+    icon        = "fa-solid fa-clock-rotate-left"
+    column_list = [Event.id, Event.event_type, Event.timestamp, Event.file_path, Event.folder_path, Event.details]
+    column_default_sort = (Event.timestamp, True)
+    column_searchable_list = [Event.event_type, Event.file_path, Event.folder_path, Event.details]
+    column_sortable_list = [Event.timestamp]
+    can_create  = False
+    can_delete  = True
+    can_edit    = False
+
+
 # ── Factory ───────────────────────────────────────────────────────────────
 
 def create_admin(app) -> Admin:
@@ -192,4 +215,5 @@ def create_admin(app) -> Admin:
     admin.add_view(UserAdmin)
     admin.add_view(NotificationAdmin)
     admin.add_view(SettingsAdmin)
+    admin.add_view(EventAdmin)
     return admin
