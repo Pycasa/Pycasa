@@ -1114,9 +1114,23 @@ const ImageDetailModal = ({
                                                 center={[details.latitude, details.longitude]}
                                                 zoom={15}
                                                 metaWheelZoom={true}
-                                                provider={(x, y, z) =>
-                                                    `https://a.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`
-                                                }
+                                                provider={(x, y, z) => {
+                                                    const mapStyle =
+                                                        localStorage.getItem('pycasa-map-style') ||
+                                                        'hybrid';
+                                                    if (mapStyle === 'roadmap') {
+                                                        return `https://mt1.google.com/vt/lyrs=m&x=${x}&y=${y}&z=${z}`;
+                                                    } else if (mapStyle === 'hybrid') {
+                                                        return `https://mt1.google.com/vt/lyrs=y&x=${x}&y=${y}&z=${z}`;
+                                                    } else if (mapStyle === 'terrain') {
+                                                        return `https://mt1.google.com/vt/lyrs=t&x=${x}&y=${y}&z=${z}`;
+                                                    } else {
+                                                        const s = ['a', 'b', 'c'][
+                                                            Math.abs(x + y) % 3
+                                                        ];
+                                                        return `https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`;
+                                                    }
+                                                }}
                                             >
                                                 <Marker
                                                     width={36}

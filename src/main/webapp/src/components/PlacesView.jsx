@@ -51,10 +51,15 @@ function clusterPoints(points, zoom, pixelRadius = 50) {
     });
 }
 
-function darkTiles(x, y, z) {
-    const s = ['a', 'b', 'c'][Math.abs(x + y) % 3];
-    return `https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`;
-}
+const mapProviders = {
+    dark: (x, y, z) => {
+        const s = ['a', 'b', 'c'][Math.abs(x + y) % 3];
+        return `https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`;
+    },
+    roadmap: (x, y, z) => `https://mt1.google.com/vt/lyrs=m&x=${x}&y=${y}&z=${z}`,
+    hybrid: (x, y, z) => `https://mt1.google.com/vt/lyrs=y&x=${x}&y=${y}&z=${z}`,
+    terrain: (x, y, z) => `https://mt1.google.com/vt/lyrs=t&x=${x}&y=${y}&z=${z}`,
+};
 
 function formatDate(ts) {
     if (!ts) return null;
@@ -63,6 +68,7 @@ function formatDate(ts) {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
+            timeZone: 'UTC',
         });
     } catch {
         return null;
@@ -78,6 +84,14 @@ const PlacesView = () => {
     const [selectedCluster, setSelectedCluster] = useState(null); // cluster whose images to show
     const [selectedImage, setSelectedImage] = useState(null); // image open in detail modal
     const [hoveredCluster, setHoveredCluster] = useState(null);
+    const [mapStyle, setMapStyle] = useState(() => {
+        return localStorage.getItem('pycasa-map-style') || 'hybrid';
+    });
+
+    const handleMapStyleChange = (style) => {
+        setMapStyle(style);
+        localStorage.setItem('pycasa-map-style', style);
+    };
 
     // Track last zoom applied to avoid double-firing from controlled re-render
     const lastZoomRef = React.useRef(3);
@@ -226,7 +240,7 @@ const PlacesView = () => {
             >
                 {/* Header overlay */}
                 <div className="absolute top-0 left-0 right-0 z-10 pointer-events-none">
-                    <div className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center justify-between px-4 py-3 gap-2 flex-wrap">
                         <div className="pointer-events-auto flex items-center gap-2 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl px-3 py-1.5 shadow-xl">
                             <MapPin className="w-3.5 h-3.5 text-indigo-400" />
                             <span className="text-white/90 text-xs font-semibold">Places</span>
@@ -235,6 +249,28 @@ const PlacesView = () => {
                                 {points.length} photo{points.length !== 1 ? 's' : ''}
                             </span>
                         </div>
+
+                        {/* Map Style Selector */}
+                        <div className="pointer-events-auto flex items-center gap-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl p-1 shadow-xl">
+                            {[
+                                { id: 'hybrid', label: 'Satellite' },
+                                { id: 'roadmap', label: 'Google Maps' },
+                                { id: 'dark', label: 'Dark Mode' },
+                            ].map((style) => (
+                                <button
+                                    key={style.id}
+                                    onClick={() => handleMapStyleChange(style.id)}
+                                    className={`px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all ${
+                                        mapStyle === style.id
+                                            ? 'bg-indigo-500 text-white shadow-sm'
+                                            : 'text-white/60 hover:text-white hover:bg-white/5'
+                                    }`}
+                                >
+                                    {style.label}
+                                </button>
+                            ))}
+                        </div>
+
                         <div className="pointer-events-auto flex items-center gap-1.5 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl px-2.5 py-1 shadow-xl">
                             <span className="text-white/40 text-[10px] font-medium uppercase tracking-wider">
                                 Z
@@ -250,27 +286,33 @@ const PlacesView = () => {
                     center={center}
                     zoom={zoom}
                     onBoundsChanged={handleBoundsChanged}
-                    provider={darkTiles}
+                    provider={mapProviders[mapStyle]}
                     attribution={
                         <span className="text-[10px] text-white/30">
-                            ©{' '}
-                            <a
-                                href="https://carto.com"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-white/40 hover:text-white/60"
-                            >
-                                CartoDB
-                            </a>{' '}
-                            ©{' '}
-                            <a
-                                href="https://openstreetmap.org"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-white/40 hover:text-white/60"
-                            >
-                                OSM
-                            </a>
+                            {mapStyle === 'dark' ? (
+                                <>
+                                    ©{' '}
+                                    <a
+                                        href="https://carto.com"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-white/40 hover:text-white/60"
+                                    >
+                                        CartoDB
+                                    </a>{' '}
+                                    ©{' '}
+                                    <a
+                                        href="https://openstreetmap.org"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-white/40 hover:text-white/60"
+                                    >
+                                        OSM
+                                    </a>
+                                </>
+                            ) : (
+                                <span className="text-white/40">© Google Maps</span>
+                            )}
                         </span>
                     }
                     style={{ height: '100%', width: '100%' }}
