@@ -42,11 +42,16 @@ const AlbumsView = () => {
     const [albumsLoading, setAlbumsLoading] = useState(true);
     const [albumSearch, setAlbumSearch] = useState('');
     const [newAlbumName, setNewAlbumName] = useState('');
+    const [newAlbumDesc, setNewAlbumDesc] = useState('');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('all'); // 'all', 'owned', 'shared'
 
     // Specific album state
     const [currentAlbum, setCurrentAlbum] = useState(null);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [isEditingDesc, setIsEditingDesc] = useState(false);
+    const [editName, setEditName] = useState('');
+    const [editDesc, setEditDesc] = useState('');
     const [images, setImages] = useState([]);
     const [imagesLoading, setImagesLoading] = useState(false);
     const [page, setPage] = useState(1);
@@ -167,12 +172,13 @@ const AlbumsView = () => {
         e.preventDefault();
         if (!newAlbumName.trim()) return;
         try {
-            const newAlbum = await api.albums.create(newAlbumName.trim());
+            const newAlbum = await api.albums.create(newAlbumName.trim(), newAlbumDesc.trim());
             toast({
                 title: 'Success',
                 description: `Album "${newAlbum.name}" created`,
             });
             setNewAlbumName('');
+            setNewAlbumDesc('');
             setIsCreateOpen(false);
             fetchAlbums();
             // Notify Sidebar to reload
@@ -183,6 +189,55 @@ const AlbumsView = () => {
                 description: err.message || 'Failed to create album',
                 variant: 'destructive',
             });
+        }
+    };
+
+    // ── Update Album Details (Name/Description) ──────────────────────────────────
+    const handleSaveName = async () => {
+        if (!editName.trim() || editName.trim() === currentAlbum?.name) {
+            setIsEditingName(false);
+            return;
+        }
+        try {
+            const updated = await api.albums.update(albumId, { name: editName.trim() });
+            setCurrentAlbum(updated);
+            toast({
+                title: 'Success',
+                description: 'Album name updated',
+            });
+            // Notify Sidebar to reload
+            window.dispatchEvent(new CustomEvent('pycasa-albums-updated'));
+        } catch (err) {
+            toast({
+                title: 'Error',
+                description: err.message || 'Failed to update album name',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsEditingName(false);
+        }
+    };
+
+    const handleSaveDesc = async () => {
+        if (editDesc.trim() === (currentAlbum?.description || '')) {
+            setIsEditingDesc(false);
+            return;
+        }
+        try {
+            const updated = await api.albums.update(albumId, { description: editDesc.trim() });
+            setCurrentAlbum(updated);
+            toast({
+                title: 'Success',
+                description: 'Album description updated',
+            });
+        } catch (err) {
+            toast({
+                title: 'Error',
+                description: err.message || 'Failed to update description',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsEditingDesc(false);
         }
     };
 
@@ -243,7 +298,7 @@ const AlbumsView = () => {
             >
                 {/* Header */}
                 <div className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 bg-white/85 dark:bg-[#060913]/85 backdrop-blur border-b border-slate-200/60 dark:border-white/[0.06] shrink-0">
-                    <div className="flex items-center gap-4 min-w-0">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
                         <button
                             onClick={() => navigate('/albums')}
                             className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/60 transition-colors"
@@ -251,11 +306,76 @@ const AlbumsView = () => {
                         >
                             <ArrowLeft className="w-5 h-5" />
                         </button>
-                        <div className="min-w-0">
-                            <h1 className="text-[16px] font-semibold text-slate-900 dark:text-white truncate">
-                                {currentAlbum?.name || 'Album'}
-                            </h1>
-                            <p className="text-[11px] text-slate-400 dark:text-white/35 font-medium mt-0.5">
+                        <div className="min-w-0 flex-1">
+                            {isEditingName ? (
+                                <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    onBlur={handleSaveName}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSaveName();
+                                        if (e.key === 'Escape') setIsEditingName(false);
+                                    }}
+                                    className="text-[16px] font-semibold text-slate-900 dark:text-white bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-sm"
+                                    autoFocus
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2 group">
+                                    <h1
+                                        onClick={() => {
+                                            setEditName(currentAlbum?.name || '');
+                                            setIsEditingName(true);
+                                        }}
+                                        className="text-[16px] font-semibold text-slate-900 dark:text-white truncate cursor-pointer hover:underline"
+                                    >
+                                        {currentAlbum?.name || 'Album'}
+                                    </h1>
+                                    <span className="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity select-none">
+                                        Click to edit
+                                    </span>
+                                </div>
+                            )}
+
+                            {isEditingDesc ? (
+                                <textarea
+                                    value={editDesc}
+                                    onChange={(e) => setEditDesc(e.target.value)}
+                                    onBlur={handleSaveDesc}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSaveDesc();
+                                        }
+                                        if (e.key === 'Escape') setIsEditingDesc(false);
+                                    }}
+                                    placeholder="Add a description..."
+                                    className="text-[12px] text-slate-600 dark:text-white/70 bg-slate-100 dark:bg-white/10 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full max-w-md mt-1 resize-none"
+                                    rows={2}
+                                    autoFocus
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2 group mt-0.5">
+                                    <p
+                                        onClick={() => {
+                                            setEditDesc(currentAlbum?.description || '');
+                                            setIsEditingDesc(true);
+                                        }}
+                                        className={`text-[12px] cursor-pointer hover:underline truncate max-w-md ${
+                                            currentAlbum?.description
+                                                ? 'text-slate-600 dark:text-white/70'
+                                                : 'text-slate-400 dark:text-white/30 italic'
+                                        }`}
+                                    >
+                                        {currentAlbum?.description || 'Add a description...'}
+                                    </p>
+                                    <span className="text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity select-none">
+                                        Click to edit
+                                    </span>
+                                </div>
+                            )}
+
+                            <p className="text-[11px] text-slate-400 dark:text-white/35 font-medium mt-1 select-none">
                                 {images.length} photo{images.length !== 1 ? 's' : ''}
                             </p>
                         </div>
@@ -264,7 +384,7 @@ const AlbumsView = () => {
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/15 text-xs font-medium"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/15 text-xs font-medium shrink-0"
                         onClick={() => handleDeleteAlbum(albumId, currentAlbum?.name)}
                     >
                         <Trash2 className="w-4 h-4 mr-1.5" />
@@ -408,19 +528,43 @@ const AlbumsView = () => {
                                             Create new album
                                         </DialogTitle>
                                         <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
-                                            Give your album a name to group your favorite memories.
+                                            Give your album a name and optional description to group
+                                            your favorite memories.
                                         </DialogDescription>
                                     </DialogHeader>
-                                    <div className="py-4">
-                                        <Input
-                                            id="album-name"
-                                            placeholder="E.g. Summer Vacation 2026"
-                                            value={newAlbumName}
-                                            onChange={(e) => setNewAlbumName(e.target.value)}
-                                            className="w-full text-sm bg-slate-50 dark:bg-white/[0.04] border-slate-200 dark:border-white/10 focus-visible:ring-indigo-500"
-                                            autoFocus
-                                            required
-                                        />
+                                    <div className="py-4 space-y-3.5">
+                                        <div className="space-y-1">
+                                            <label
+                                                htmlFor="album-name"
+                                                className="text-[11px] font-medium text-slate-400 dark:text-white/40"
+                                            >
+                                                Album Name
+                                            </label>
+                                            <Input
+                                                id="album-name"
+                                                placeholder="E.g. Summer Vacation 2026"
+                                                value={newAlbumName}
+                                                onChange={(e) => setNewAlbumName(e.target.value)}
+                                                className="w-full text-sm bg-slate-50 dark:bg-white/[0.04] border-slate-200 dark:border-white/10 focus-visible:ring-indigo-500"
+                                                autoFocus
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label
+                                                htmlFor="album-desc"
+                                                className="text-[11px] font-medium text-slate-400 dark:text-white/40"
+                                            >
+                                                Description (optional)
+                                            </label>
+                                            <textarea
+                                                id="album-desc"
+                                                placeholder="Describe this album..."
+                                                value={newAlbumDesc}
+                                                onChange={(e) => setNewAlbumDesc(e.target.value)}
+                                                className="w-full text-sm bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-white placeholder:text-slate-400 resize-none h-20"
+                                            />
+                                        </div>
                                     </div>
                                     <DialogFooter>
                                         <Button

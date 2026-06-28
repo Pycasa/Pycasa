@@ -663,14 +663,19 @@ const ImageDetailModal = ({
                         className="flex items-center justify-center w-8 h-8 rounded-full select-none cursor-default"
                     >
                         {isBeingAnalyzed ? (
-                            <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                            <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
                         ) : image?.ai_analysed ? (
-                            <Sparkles
-                                className="w-4 h-4 text-indigo-400 opacity-70"
-                                strokeWidth={1.6}
+                            <img
+                                src="/site-images/ai-icon.png"
+                                alt="AI"
+                                className="w-[23px] h-[23px] object-contain"
                             />
                         ) : (
-                            <Sparkles className="w-4 h-4 text-white/20" strokeWidth={1.6} />
+                            <img
+                                src="/site-images/ai-icon.png"
+                                alt="AI"
+                                className="w-[23px] h-[23px] object-contain opacity-30 grayscale"
+                            />
                         )}
                     </span>
                     {image?.trashed && (
@@ -1142,9 +1147,17 @@ const ImageDetailModal = ({
                                     {isBeingAnalyzed ? (
                                         <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
                                     ) : image?.ai_analysed ? (
-                                        <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                                        <img
+                                            src="/site-images/ai-icon.png"
+                                            alt="AI"
+                                            className="w-3.5 h-3.5 shrink-0 object-contain"
+                                        />
                                     ) : (
-                                        <Sparkles className="w-3.5 h-3.5 shrink-0 opacity-40" />
+                                        <img
+                                            src="/site-images/ai-icon.png"
+                                            alt="AI"
+                                            className="w-3.5 h-3.5 shrink-0 object-contain opacity-40 grayscale"
+                                        />
                                     )}
                                     <span>
                                         {isBeingAnalyzed
@@ -1160,9 +1173,10 @@ const ImageDetailModal = ({
                                     disabled={isAnalysing}
                                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition-all disabled:opacity-40 mb-2"
                                 >
-                                    <Sparkles
-                                        className={`w-4 h-4 shrink-0 text-gray-400 ${isAnalysing ? 'animate-spin' : ''}`}
-                                        strokeWidth={1.6}
+                                    <img
+                                        src="/site-images/ai-icon.png"
+                                        alt=""
+                                        className={`w-4 h-4 shrink-0 object-contain ${isAnalysing ? 'animate-spin' : ''}`}
                                     />
                                     {isAnalysing ? 'Analysing…' : 'AI Analyse'}
                                 </button>

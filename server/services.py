@@ -361,11 +361,11 @@ class FolderScanService:
         try:
             logger.info(f"Starting scan for folder {state.label} ({path})")
 
-            # Find all image files
+            # ── Phase 1: Discover all image files ─────────────────────────────
             files_to_index = []
             for root, dirs, files in os.walk(path):
                 if state.cancelled:
-                    logger.info(f"Scan cancelled for folder {state.label}")
+                    logger.info(f"Scan cancelled (discovery) for folder {state.label}")
                     return
                 for f in files:
                     ext = os.path.splitext(f)[1].lower()
@@ -375,6 +375,27 @@ class FolderScanService:
             state.total = len(files_to_index)
             logger.info(f"Found {state.total} images to index in {state.label}")
 
+            # Persist total to DB so the REST API can expose it immediately
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE monitored_folders SET total_files = ? WHERE id = ?",
+                    (state.total, folder_id)
+                )
+
+            # Announce total up-front so the UI progress bar has a denominator
+            notification_service.broadcast(
+                "scan:folder:started",
+                {
+                    "message": f"Scanning: {state.label}",
+                    "folder_id": folder_id,
+                    "folder_label": state.label,
+                    "total": state.total,
+                    "scanned": 0,
+                    "current_file": ""
+                }
+            )
+
+            # ── Phase 2: Index each file ───────────────────────────────────────
             for f_path in files_to_index:
                 if state.cancelled:
                     logger.info(f"Scan cancelled for folder {state.label}")
@@ -392,7 +413,8 @@ class FolderScanService:
                     "detail": f"Indexed {state.scanned} images",
                     "folder_id": folder_id,
                     "folder_label": state.label,
-                    "total": state.scanned
+                    "total": state.total,
+                    "scanned": state.scanned
                 }
             )
         except Exception as e:
@@ -498,7 +520,56 @@ class AiService:
         self.total = 0
         self.current_status = "idle"
         self.current_file = ""
+        self.pause_requested = False
         self.lock = threading.Lock()
+
+    # ── Pause / Resume helpers ──────────────────────────────────────────────
+
+    def _read_paused_from_db(self) -> bool:
+        try:
+            with get_db() as conn:
+                row = conn.execute("SELECT ai_paused FROM app_settings WHERE id = 'settings'").fetchone()
+                return bool(row["ai_paused"]) if row else False
+        except Exception:
+            return False
+
+    def _write_paused_to_db(self, paused: bool):
+        try:
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE app_settings SET ai_paused = ? WHERE id = 'settings'",
+                    (1 if paused else 0,)
+                )
+        except Exception as e:
+            logger.warning(f"Failed to persist ai_paused={paused}: {e}")
+
+    def pause(self):
+        """Signal the running batch to stop after the current image."""
+        self._write_paused_to_db(True)
+        with self.lock:
+            self.pause_requested = True
+            self.current_status = "pausing"
+        db_total, db_analysed = self._get_db_stats()
+        notification_service.broadcast(
+            "ai:paused",
+            {
+                "message": "AI analysis paused",
+                "analysed": self.analysed,
+                "total": self.total,
+                "db_total": db_total,
+                "db_analysed": db_analysed
+            }
+        )
+
+    def resume(self):
+        """Clear the pause flag and restart batch analysis on unprocessed images."""
+        self._write_paused_to_db(False)
+        with self.lock:
+            self.pause_requested = False
+            if self.analysing:
+                # Already running (shouldn't normally happen), nothing to do
+                return
+        self.trigger_batch_analysis(rerun=False)
 
     def get_analysis_status(self) -> dict:
         db_total = 0
@@ -512,10 +583,13 @@ class AiService:
         except Exception as e:
             logger.warning(f"Failed to query overall AI stats: {e}")
 
+        paused = self._read_paused_from_db()
+
         with self.lock:
             return {
                 "running": self.analysing,
                 "is_running": self.analysing,
+                "paused": paused,
                 "analysed": self.analysed,
                 "processed_files": self.analysed,
                 "total": self.total,
@@ -541,6 +615,7 @@ class AiService:
             if self.analysing:
                 return
             self.analysing = True
+            self.pause_requested = False
             self.current_status = "running"
 
         t = threading.Thread(target=self._do_batch_analysis, args=(rerun,), daemon=True)
@@ -576,24 +651,35 @@ class AiService:
                 cursor = conn.execute("SELECT * FROM app_settings WHERE id = 'settings'")
                 settings = cursor.fetchone()
 
+            last_progress_broadcast = 0.0
+
             for img in images:
+                # ── Check pause ───────────────────────────────────────────────
+                with self.lock:
+                    should_pause = self.pause_requested
+
+                if should_pause:
+                    logger.info("AI batch analysis paused by user request")
+                    with self.lock:
+                        self.current_status = "paused"
+                    db_total, db_analysed = self._get_db_stats()
+                    notification_service.broadcast(
+                        "ai:paused",
+                        {
+                            "message": "AI analysis paused",
+                            "analysed": self.analysed,
+                            "total": self.total,
+                            "db_total": db_total,
+                            "db_analysed": db_analysed
+                        }
+                    )
+                    return  # Exit thread; resume() will start a new one
+
                 file_path = img["file_path"]
                 filename = os.path.basename(file_path)
 
                 with self.lock:
                     self.current_file = filename
-
-                db_total, db_analysed = self._get_db_stats()
-                notification_service.broadcast(
-                    "ai:progress",
-                    {
-                        "analysed": self.analysed,
-                        "total": self.total,
-                        "current_file": filename,
-                        "db_total": db_total,
-                        "db_analysed": db_analysed
-                    }
-                )
 
                 try:
                     self.analyse_image(img["id"], file_path, settings)
@@ -611,21 +697,28 @@ class AiService:
                     self.analysed += 1
                     done = self.analysed
 
-                db_total, db_analysed = self._get_db_stats()
-                notification_service.broadcast(
-                    "ai:progress",
-                    {
-                        "analysed": done,
-                        "total": self.total,
-                        "current_file": filename,
-                        "db_total": db_total,
-                        "db_analysed": db_analysed
-                    }
-                )
+                # Throttle progress broadcasts to at most once per second
+                now = time.time()
+                if now - last_progress_broadcast >= 1.0:
+                    last_progress_broadcast = now
+                    db_total, db_analysed = self._get_db_stats()
+                    notification_service.broadcast(
+                        "ai:progress",
+                        {
+                            "analysed": done,
+                            "total": self.total,
+                            "current_file": filename,
+                            "db_total": db_total,
+                            "db_analysed": db_analysed
+                        }
+                    )
 
             with self.lock:
                 self.current_status = "completed"
                 done = self.analysed
+
+            # Clear the paused flag when we complete naturally
+            self._write_paused_to_db(False)
 
             db_total, db_analysed = self._get_db_stats()
             notification_service.broadcast(

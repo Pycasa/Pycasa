@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Map, Overlay } from 'pigeon-maps';
 import { api } from '@/lib/api';
-import { MapPin, X, Loader2, Image as ImageIcon, Calendar } from 'lucide-react';
+import { MapPin, X, Loader2, Image as ImageIcon, Calendar, FolderClosed, Plus } from 'lucide-react';
 import ImageDetailModal from './ImageDetailModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useToast } from '@/components/ui/use-toast';
 
 // ─── Geo Clustering ───────────────────────────────────────────────────────────
 function clusterPoints(points, zoom, pixelRadius = 50) {
@@ -75,8 +77,11 @@ const PlacesView = () => {
     const [center, setCenter] = useState([20, 0]);
     const [selectedCluster, setSelectedCluster] = useState(null); // cluster whose images to show
     const [selectedImage, setSelectedImage] = useState(null); // image open in detail modal
-    const [imageDetail, setImageDetail] = useState(null); // full detail for modal
     const [hoveredCluster, setHoveredCluster] = useState(null);
+
+    // Track last zoom applied to avoid double-firing from controlled re-render
+    const lastZoomRef = React.useRef(3);
+    const lastCenterRef = React.useRef([20, 0]);
 
     useEffect(() => {
         const load = async () => {
@@ -87,8 +92,11 @@ const PlacesView = () => {
                 if (data && data.length > 0) {
                     const avgLat = data.reduce((s, p) => s + p.lat, 0) / data.length;
                     const avgLng = data.reduce((s, p) => s + p.lng, 0) / data.length;
+                    const initZoom = data.length === 1 ? 12 : 3;
+                    lastZoomRef.current = initZoom;
+                    lastCenterRef.current = [avgLat, avgLng];
                     setCenter([avgLat, avgLng]);
-                    setZoom(data.length === 1 ? 12 : 3);
+                    setZoom(initZoom);
                 }
             } catch {
                 /* silently ignore */
@@ -104,30 +112,73 @@ const PlacesView = () => {
         return clusterPoints(points, zoom);
     }, [points, zoom]);
 
+    const handleBoundsChanged = useCallback(({ center: c, zoom: z }) => {
+        const roundedZ = Math.round(z);
+        // Only update state if values actually changed — prevents the controlled-prop
+        // feedback loop that caused every zoom/pan to fire twice
+        if (roundedZ !== lastZoomRef.current) {
+            lastZoomRef.current = roundedZ;
+            setZoom(roundedZ);
+        }
+        if (
+            Math.abs(c[0] - lastCenterRef.current[0]) > 0.0001 ||
+            Math.abs(c[1] - lastCenterRef.current[1]) > 0.0001
+        ) {
+            lastCenterRef.current = c;
+            setCenter(c);
+        }
+    }, []);
+
     const handleClusterClick = useCallback((cluster) => {
         // Always show the photo panel for any cluster or single point
         setSelectedCluster(cluster);
         // Also pan map to the cluster center
-        setCenter([cluster.lat, cluster.lng]);
+        const newCenter = [cluster.lat, cluster.lng];
+        lastCenterRef.current = newCenter;
+        setCenter(newCenter);
     }, []);
 
     const thumbnailUrl = useCallback((img) => api.images.getThumbnail(img.file_path), []);
 
-    // Open full detail modal for a photo
-    const openImage = useCallback(async (img) => {
-        setSelectedImage(img);
-        try {
-            const detail = await api.images.getDetails(img.file_path);
-            setImageDetail(detail);
-        } catch {
-            setImageDetail(null);
-        }
-    }, []);
+    // Open full detail modal for a photo — normalise shape for ImageDetailModal
+    const normalisePhoto = useCallback(
+        (img) => ({
+            ...img,
+            full_path: img.file_path || img.full_path,
+            modified: img.modified_at,
+            size: img.file_size,
+        }),
+        []
+    );
+
+    const openImage = useCallback(
+        (img) => {
+            setSelectedImage(normalisePhoto(img));
+        },
+        [normalisePhoto]
+    );
 
     const closeModal = useCallback(() => {
         setSelectedImage(null);
-        setImageDetail(null);
     }, []);
+
+    // Navigate within the current cluster's photo list
+    const clusterPhotos = selectedCluster?.points ?? [];
+    const selectedIdx = selectedImage
+        ? clusterPhotos.findIndex((p) => p.id === selectedImage.id)
+        : -1;
+
+    const goNext = useCallback(() => {
+        if (selectedIdx < clusterPhotos.length - 1) {
+            setSelectedImage(normalisePhoto(clusterPhotos[selectedIdx + 1]));
+        }
+    }, [selectedIdx, clusterPhotos, normalisePhoto]);
+
+    const goPrev = useCallback(() => {
+        if (selectedIdx > 0) {
+            setSelectedImage(normalisePhoto(clusterPhotos[selectedIdx - 1]));
+        }
+    }, [selectedIdx, clusterPhotos, normalisePhoto]);
 
     if (loading) {
         return (
@@ -198,11 +249,7 @@ const PlacesView = () => {
                 <Map
                     center={center}
                     zoom={zoom}
-                    onBoundsChanged={({ center: c, zoom: z }) => {
-                        setCenter(c);
-                        setZoom(Math.round(z));
-                        // If user pans/zooms manually, re-cluster but keep panel open
-                    }}
+                    onBoundsChanged={handleBoundsChanged}
                     provider={darkTiles}
                     attribution={
                         <span className="text-[10px] text-white/30">
@@ -270,8 +317,16 @@ const PlacesView = () => {
             )}
 
             {/* ── Full detail modal ── */}
-            {selectedImage && imageDetail && (
-                <ImageDetailModal image={imageDetail} isOpen={true} onClose={closeModal} />
+            {selectedImage && (
+                <ImageDetailModal
+                    image={selectedImage}
+                    isOpen={true}
+                    onClose={closeModal}
+                    onNext={goNext}
+                    onPrevious={goPrev}
+                    hasNext={selectedIdx < clusterPhotos.length - 1}
+                    hasPrevious={selectedIdx > 0}
+                />
             )}
         </div>
     );
@@ -372,6 +427,76 @@ const ClusterMarker = ({ cluster, thumbnailUrl, onClick, onHover, isHovered, isS
 const ClusterPhotoPanel = ({ cluster, thumbnailUrl, onClose, onImageClick }) => {
     // Points are already sorted desc by date in clusterPoints()
     const photos = cluster.points;
+    const { toast } = useToast();
+
+    const [allAlbums, setAllAlbums] = useState([]);
+    const [newAlbumName, setNewAlbumName] = useState(cluster.locationName || '');
+    const [isAddingAlbum, setIsAddingAlbum] = useState(false);
+
+    const fetchAlbums = async () => {
+        try {
+            const data = await api.albums.list();
+            setAllAlbums(data || []);
+        } catch (err) {
+            console.error('Failed to load albums:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchAlbums();
+    }, []);
+
+    // Keep the prefilled name updated if the selected cluster changes
+    useEffect(() => {
+        setNewAlbumName(cluster.locationName || '');
+    }, [cluster]);
+
+    const handleAddToAlbum = async (albumId) => {
+        const imageIds = photos.map((p) => p.id);
+        try {
+            setIsAddingAlbum(true);
+            await api.albums.addImages(albumId, imageIds);
+            window.dispatchEvent(new CustomEvent('pycasa-albums-updated'));
+            toast({
+                title: 'Success',
+                description: `Added ${imageIds.length} photos to album`,
+            });
+        } catch (err) {
+            toast({
+                title: 'Error',
+                description: 'Failed to add photos to album',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsAddingAlbum(false);
+        }
+    };
+
+    const handleCreateAndAddToAlbum = async (e) => {
+        e.preventDefault();
+        if (!newAlbumName.trim()) return;
+        const imageIds = photos.map((p) => p.id);
+        try {
+            setIsAddingAlbum(true);
+            const newAlbum = await api.albums.create(newAlbumName.trim());
+            await api.albums.addImages(newAlbum.id, imageIds);
+            window.dispatchEvent(new CustomEvent('pycasa-albums-updated'));
+            toast({
+                title: 'Success',
+                description: `Created album "${newAlbumName}" with ${imageIds.length} photos`,
+            });
+            setNewAlbumName('');
+            fetchAlbums();
+        } catch (err) {
+            toast({
+                title: 'Error',
+                description: 'Failed to create album',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsAddingAlbum(false);
+        }
+    };
 
     // Group photos by date for section headers
     const grouped = useMemo(() => {
@@ -411,6 +536,78 @@ const ClusterPhotoPanel = ({ cluster, thumbnailUrl, onClose, onImageClick }) => 
                         {cluster.count} asset{cluster.count !== 1 ? 's' : ''} · newest first
                     </p>
                 </div>
+
+                {/* Add to Album Popover */}
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <button
+                            title="Add all to album"
+                            className="w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/50 hover:text-white transition-colors shrink-0"
+                        >
+                            <FolderClosed className="w-4 h-4" />
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                        className="w-64 p-3 bg-zinc-950 border border-zinc-800 text-white shadow-2xl rounded-xl space-y-3 z-50"
+                        align="end"
+                    >
+                        <div className="space-y-1.5">
+                            <p className="text-xs font-semibold text-zinc-400">
+                                Add cluster to Album
+                            </p>
+                            <div className="max-h-32 overflow-y-auto space-y-1 no-scrollbar">
+                                {allAlbums.length > 0 ? (
+                                    allAlbums.map((album) => (
+                                        <div
+                                            key={album.id}
+                                            className="flex items-center justify-between px-2 py-1 rounded text-xs hover:bg-white/5 text-zinc-200 transition-colors"
+                                        >
+                                            <span className="truncate flex-1 pr-2">
+                                                {album.name}
+                                            </span>
+                                            <button
+                                                onClick={() => handleAddToAlbum(album.id)}
+                                                className="text-indigo-400 hover:text-indigo-300 p-1 rounded transition-colors shrink-0 hover:bg-indigo-500/10"
+                                                title="Add to this album"
+                                                disabled={isAddingAlbum}
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-[10px] text-zinc-500 py-2 text-center">
+                                        No albums yet
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="border-t border-white/10 pt-2.5">
+                            <form onSubmit={handleCreateAndAddToAlbum} className="space-y-1.5">
+                                <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                                    New Album
+                                </p>
+                                <div className="flex gap-1.5">
+                                    <input
+                                        value={newAlbumName}
+                                        onChange={(e) => setNewAlbumName(e.target.value)}
+                                        placeholder="Album name..."
+                                        className="flex-1 min-w-0 bg-white/[0.05] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500"
+                                        disabled={isAddingAlbum}
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={isAddingAlbum || !newAlbumName.trim()}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white p-1 rounded disabled:opacity-50 flex items-center justify-center shrink-0"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+
                 <button
                     onClick={onClose}
                     className="w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/50 hover:text-white transition-colors shrink-0"

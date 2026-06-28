@@ -246,10 +246,15 @@ class ApiClient {
     // Albums API
     albums = {
         list: () => this.request('/albums'),
-        create: (name) =>
+        create: (name, description = null) =>
             this.request('/albums', {
                 method: 'POST',
-                body: JSON.stringify({ name }),
+                body: JSON.stringify({ name, description }),
+            }),
+        update: (albumId, data) =>
+            this.request(`/albums/${albumId}`, {
+                method: 'PATCH',
+                body: JSON.stringify(data),
             }),
         delete: (albumId) =>
             this.request(`/albums/${albumId}`, {
@@ -326,6 +331,8 @@ class ApiClient {
                 method: 'POST',
                 body: JSON.stringify({ rerun }),
             }),
+        pauseAnalysis: () => this.request('/ai/pause', { method: 'POST' }),
+        resumeAnalysis: () => this.request('/ai/resume', { method: 'POST' }),
         getAnalysisStatus: () => this.request('/ai/analysis-status'),
     };
 }

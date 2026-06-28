@@ -245,6 +245,27 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
 
+        # Add total_files to monitored_folders for scan progress tracking
+        try:
+            conn.execute("ALTER TABLE monitored_folders ADD COLUMN total_files INTEGER DEFAULT 0;")
+            logger.info("Migrated database: added total_files column to monitored_folders")
+        except sqlite3.OperationalError:
+            pass
+
+        # Add ai_paused to app_settings for persistent pause state
+        try:
+            conn.execute("ALTER TABLE app_settings ADD COLUMN ai_paused INTEGER DEFAULT 0;")
+            logger.info("Migrated database: added ai_paused column to app_settings")
+        except sqlite3.OperationalError:
+            pass
+
+        # Add description to albums table
+        try:
+            conn.execute("ALTER TABLE albums ADD COLUMN description TEXT;")
+            logger.info("Migrated database: added description column to albums table")
+        except sqlite3.OperationalError:
+            pass
+
         # Backfill folder_path for events
         try:
             cursor = conn.execute("SELECT id, file_path FROM events WHERE folder_path IS NULL OR folder_path = ''")

@@ -104,17 +104,17 @@ const ImageCard = ({ image, isSelected, onSelect, rowHeight = 180, onFavoriteTog
             {/* AI status badge — always visible, top-right corner */}
             {(isBeingAnalyzed || imgData.ai_analysed) && (
                 <div
-                    className={`absolute top-2 right-2 z-20 flex items-center justify-center rounded-full p-1 shadow-lg backdrop-blur-sm transition-all duration-300 ${
-                        isBeingAnalyzed
-                            ? 'bg-amber-500/80 border border-amber-300/60'
-                            : 'bg-indigo-600/70 border border-indigo-300/40'
-                    }`}
+                    className="absolute top-1 right-1 z-20 flex items-center justify-center p-1 pointer-events-none"
                     title={isBeingAnalyzed ? 'AI analysis in progress…' : 'AI analysed'}
                 >
                     {isBeingAnalyzed ? (
-                        <Loader2 className="w-3 h-3 text-white animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 text-white animate-spin drop-shadow-md" />
                     ) : (
-                        <Sparkles className="w-3 h-3 text-white" />
+                        <img
+                            src="/site-images/ai-icon.png"
+                            alt="AI"
+                            className="w-4 h-4 object-contain drop-shadow-md"
+                        />
                     )}
                 </div>
             )}

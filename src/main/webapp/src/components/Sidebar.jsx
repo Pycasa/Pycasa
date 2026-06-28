@@ -18,6 +18,9 @@ import {
     Trash2,
     Lock,
     MapPin,
+    Play,
+    Pause,
+    Loader2,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -27,7 +30,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { unreadCount, aiStatus } = useNotifications();
+    const { unreadCount, aiStatus, folderScans } = useNotifications();
     const [isCollapsed, setIsCollapsed] = useState(() => {
         const saved = localStorage.getItem('sidebar-collapsed');
         return saved === 'true';
@@ -37,26 +40,6 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
     const [isAlbumsExpanded, setIsAlbumsExpanded] = useState(true);
     const [dbSizeStr, setDbSizeStr] = useState('1.2 GB');
     const [dbSizePercent, setDbSizePercent] = useState(12);
-    const [localAIStatus, setLocalAIStatus] = useState(null);
-
-    useEffect(() => {
-        const updateStats = async () => {
-            try {
-                const ai = await api.ai.getAnalysisStatus();
-                setLocalAIStatus({
-                    is_running: ai.is_running || ai.running,
-                    db_total: ai.db_total || 0,
-                    db_analysed: ai.db_analysed || 0,
-                });
-            } catch (err) {
-                console.error('Failed to refresh AI status:', err);
-            }
-        };
-
-        updateStats();
-        const interval = setInterval(updateStats, 3000);
-        return () => clearInterval(interval);
-    }, []);
 
     useEffect(() => {
         localStorage.setItem('sidebar-collapsed', isCollapsed);
@@ -141,7 +124,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
 
                     <button
                         onClick={() => setIsCollapsed(!isCollapsed)}
-                        className="hidden md:flex items-center justify-center w-5 h-5 rounded-full border border-slate-200 dark:border-white/10 hover:bg-slate-200/50 dark:hover:bg-white/10 text-slate-400 dark:text-white/30 hover:text-slate-600 dark:hover:text-white/70 transition-colors"
+                        className="hidden md:flex items-center justify-center w-5 h-5 rounded-full hover:bg-slate-200/50 dark:hover:bg-white/10 text-slate-400 dark:text-white/30 hover:text-slate-600 dark:hover:text-white/70 transition-colors"
                     >
                         {isCollapsed ? (
                             <ChevronRight className="w-3 h-3" />
@@ -387,59 +370,206 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
             {/* Sidebar Bottom Section: Storage & Version */}
             <div className="p-3 border-t border-slate-200 dark:border-white/[0.06] space-y-2 shrink-0">
                 {/* AI Analysis Widget Card */}
-                {!isCollapsed && (
-                    <Tooltip delayDuration={300}>
-                        <TooltipTrigger asChild>
-                            <div className="bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.06] cursor-help transition-colors hover:bg-slate-200/50 dark:hover:bg-white/[0.08]">
-                                <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">
-                                    <span>AI Analysis</span>
-                                    <span className="tabular-nums font-medium text-slate-500 dark:text-white/60">
-                                        {localAIStatus?.db_analysed || 0} of{' '}
-                                        {localAIStatus?.db_total || 0}
-                                    </span>
-                                </div>
-                                {(() => {
-                                    const total = localAIStatus?.db_total || 0;
-                                    const analysed = localAIStatus?.db_analysed || 0;
-                                    const percent =
-                                        total > 0 ? Math.round((analysed / total) * 100) : 0;
-                                    return (
-                                        <>
-                                            <div className="w-full bg-slate-200 dark:bg-white/10 h-1 rounded-full overflow-hidden mb-2">
-                                                <div
-                                                    className="bg-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
-                                                    style={{ width: `${percent}%` }}
-                                                />
-                                            </div>
-                                            <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-white/45">
-                                                <span>{percent}% analysed</span>
-                                                {localAIStatus?.is_running && (
-                                                    <span className="text-indigo-500 dark:text-indigo-400 animate-pulse font-medium">
-                                                        Analyzing...
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </>
-                                    );
-                                })()}
-                            </div>
-                        </TooltipTrigger>
-                        <TooltipContent
-                            side="right"
-                            align="center"
-                            className="max-w-xs text-xs bg-zinc-900 border-zinc-800 text-white shadow-xl p-3 space-y-1"
-                        >
-                            <p className="font-semibold text-indigo-400">AI Metadata Indexing</p>
-                            <p className="text-zinc-300 leading-relaxed">
-                                Shows the proportion of images in your library processed by the
-                                local AI vision model. AI analysis generates descriptions and tags
-                                to enable smart search and filtering.
-                            </p>
-                        </TooltipContent>
-                    </Tooltip>
-                )}
+                {!isCollapsed &&
+                    (() => {
+                        const total = aiStatus?.db_total || 0;
+                        const analysed = aiStatus?.db_analysed || 0;
+                        const percent = total > 0 ? Math.round((analysed / total) * 100) : 0;
+                        const isRunning = aiStatus?.is_running || false;
+                        const isPaused = aiStatus?.paused || false;
+                        const pending = total - analysed;
 
-                {/* Storage Widget Card (modern style) */}
+                        const handlePlayPause = async () => {
+                            try {
+                                if (isRunning) {
+                                    await api.ai.pauseAnalysis();
+                                } else {
+                                    await api.ai.resumeAnalysis();
+                                }
+                            } catch (e) {
+                                console.error('AI control failed:', e);
+                            }
+                        };
+
+                        let statusLabel;
+                        let statusColor;
+                        if (isRunning) {
+                            statusLabel = 'Analyzing...';
+                            statusColor = 'text-indigo-500 dark:text-indigo-400';
+                        } else if (isPaused) {
+                            statusLabel = 'Paused';
+                            statusColor = 'text-amber-500 dark:text-amber-400';
+                        } else if (pending === 0 && total > 0) {
+                            statusLabel = 'Complete';
+                            statusColor = 'text-emerald-500 dark:text-emerald-400';
+                        } else {
+                            statusLabel = `${pending} pending`;
+                            statusColor = 'text-slate-400 dark:text-white/40';
+                        }
+
+                        return (
+                            <Tooltip delayDuration={300}>
+                                <TooltipTrigger asChild>
+                                    <div className="bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.06] cursor-help transition-colors hover:bg-slate-200/50 dark:hover:bg-white/[0.08]">
+                                        <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">
+                                            <span className="flex items-center gap-1.5 select-none">
+                                                <img
+                                                    src="/site-images/ai-icon.png"
+                                                    alt="AI"
+                                                    className="w-3.5 h-3.5 object-contain"
+                                                />
+                                                Pycasa AI
+                                            </span>
+                                            <span className="tabular-nums font-medium text-slate-500 dark:text-white/60">
+                                                {analysed} of {total}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-slate-200 dark:bg-white/10 h-1 rounded-full overflow-hidden mb-2">
+                                            <div
+                                                className="bg-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
+                                                style={{ width: `${percent}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px]">
+                                            <span className={`font-medium ${statusColor}`}>
+                                                {isRunning && (
+                                                    <Loader2 className="inline w-2.5 h-2.5 mr-1 animate-spin" />
+                                                )}
+                                                {statusLabel}
+                                            </span>
+                                            {/* Play / Pause button */}
+                                            {total > 0 && !isCollapsed && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handlePlayPause();
+                                                    }}
+                                                    title={
+                                                        isRunning
+                                                            ? 'Pause AI analysis'
+                                                            : 'Start / Resume AI analysis'
+                                                    }
+                                                    className={`flex items-center justify-center w-5 h-5 rounded-full transition-all ${
+                                                        isRunning
+                                                            ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
+                                                            : 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
+                                                    }`}
+                                                >
+                                                    {isRunning ? (
+                                                        <Pause className="w-2.5 h-2.5" />
+                                                    ) : (
+                                                        <Play className="w-2.5 h-2.5" />
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                    side="right"
+                                    align="center"
+                                    className="max-w-xs text-xs bg-zinc-900 border-zinc-800 text-white shadow-xl p-3 space-y-1"
+                                >
+                                    <p className="font-semibold text-indigo-400">Pycasa AI</p>
+                                    <p className="text-zinc-300 leading-relaxed">
+                                        {analysed} of {total} images analysed ({percent}%). Pycasa
+                                        AI processes images in the background to generate
+                                        descriptions and tags for smart search.
+                                    </p>
+                                    {isPaused && (
+                                        <p className="text-amber-400 font-medium">
+                                            ⏸ Analysis is paused. Click ▶ to resume.
+                                        </p>
+                                    )}
+                                </TooltipContent>
+                            </Tooltip>
+                        );
+                    })()}
+
+                {/* Scan Progress Widget — shown when any folder is being scanned */}
+                {!isCollapsed &&
+                    (() => {
+                        const entries = Object.values(folderScans || {});
+                        if (entries.length === 0) return null;
+
+                        const totalScanned = entries.reduce((s, e) => s + (e.scanned || 0), 0);
+                        const totalFiles = entries.reduce((s, e) => s + (e.total || 0), 0);
+                        const pct =
+                            totalFiles > 0 ? Math.round((totalScanned / totalFiles) * 100) : 0;
+                        // Current file: the one most recently touched (last entry in map)
+                        const lastEntry = entries[entries.length - 1];
+                        const currentFile = lastEntry?.current_file || '';
+
+                        const tooltipContent = (
+                            <div className="space-y-2">
+                                <p className="font-semibold text-emerald-400">Scanning folders</p>
+                                {entries.map((e, i) => {
+                                    const p =
+                                        e.total > 0 ? Math.round((e.scanned / e.total) * 100) : 0;
+                                    return (
+                                        <div key={i}>
+                                            <div className="flex justify-between text-[11px] mb-0.5">
+                                                <span className="text-zinc-300 font-medium truncate max-w-[160px]">
+                                                    {e.label}
+                                                </span>
+                                                <span className="text-zinc-400 ml-2 tabular-nums">
+                                                    {e.scanned}/{e.total}
+                                                </span>
+                                            </div>
+                                            {e.current_file && (
+                                                <p className="text-[10px] text-zinc-500 truncate max-w-[200px]">
+                                                    ⤷ {e.current_file}
+                                                </p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+
+                        return (
+                            <Tooltip delayDuration={100}>
+                                <TooltipTrigger asChild>
+                                    <div className="bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40 cursor-help transition-colors hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20">
+                                        <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="relative flex h-1.5 w-1.5">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                                                </span>
+                                                Scanning
+                                            </span>
+                                            <span className="tabular-nums font-medium text-slate-500 dark:text-white/60">
+                                                {totalScanned} / {totalFiles}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-slate-200 dark:bg-white/10 h-1 rounded-full overflow-hidden mb-2">
+                                            <div
+                                                className="bg-emerald-500 h-full rounded-full transition-all duration-300 ease-out"
+                                                style={{ width: `${pct}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-white/45">
+                                            <span>{pct}% indexed</span>
+                                            {currentFile && (
+                                                <span className="truncate max-w-[110px] text-right text-slate-400 dark:text-white/30 font-normal">
+                                                    {currentFile}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                    side="right"
+                                    align="end"
+                                    className="max-w-xs text-xs bg-zinc-900 border-zinc-800 text-white shadow-xl p-3"
+                                >
+                                    {tooltipContent}
+                                </TooltipContent>
+                            </Tooltip>
+                        );
+                    })()}
+
                 {!isCollapsed && (
                     <div className="bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.06]">
                         <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">

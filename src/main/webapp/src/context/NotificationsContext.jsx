@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import React, {
+    createContext,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+    useCallback,
+    startTransition,
+} from 'react';
 import { api } from '@/lib/api';
 
 const NotificationsContext = createContext();
@@ -18,6 +26,7 @@ const PROGRESS_TYPES = new Set([
     'scan:folder:progress',
     'scan:cancelling',
     'ai:progress',
+    'ai:paused',
     'folder-delete:progress',
 ]);
 
@@ -29,10 +38,13 @@ export const NotificationsProvider = ({ children }) => {
     const [scanStatus, setScanStatus] = useState({ is_scanning: false, files_found: 0 });
     const [aiStatus, setAiStatus] = useState({
         is_running: false,
+        paused: false,
         processed_files: 0,
         total_files: 0,
         current_file: '',
     });
+    // Per-folder scan state: { [folder_id]: { label, scanned, total, current_file } }
+    const [folderScans, setFolderScans] = useState({});
     const wsRef = useRef(null);
     const reconnectTimer = useRef(null);
     const mountedRef = useRef(true);
@@ -54,6 +66,7 @@ export const NotificationsProvider = ({ children }) => {
                     const ai = await api.ai.getAnalysisStatus();
                     setAiStatus({
                         is_running: ai.is_running || ai.running,
+                        paused: ai.paused || false,
                         processed_files: ai.processed_files || ai.analysed,
                         total_files: ai.total_files || ai.total,
                         current_file: ai.current_file || '',
@@ -94,12 +107,41 @@ export const NotificationsProvider = ({ children }) => {
             setScanStatus({ is_scanning: false, files_found: event.payload.total });
         } else if (event.type === 'scan:error') {
             setScanStatus({ is_scanning: false, files_found: 0 });
+        } else if (event.type === 'scan:folder:started') {
+            // Phase 1 complete — we know the total now
+            const { folder_id, folder_label, total } = event.payload;
+            if (folder_id) {
+                setFolderScans((prev) => ({
+                    ...prev,
+                    [folder_id]: {
+                        label: folder_label || folder_id,
+                        scanned: 0,
+                        total: total || 0,
+                        current_file: '',
+                    },
+                }));
+            }
+            setScanStatus((prev) => ({ ...prev, is_scanning: true }));
         } else if (event.type === 'scan:folder:progress') {
-            // Per-folder progress → keep navbar pill active and show running total
-            setScanStatus((prev) => ({
-                is_scanning: true,
-                files_found: (prev.files_found || 0) + 1,
-            }));
+            // Per-folder progress → low-priority update, must not block user interaction
+            const { folder_id, folder_label, scanned, total, current_file } = event.payload;
+            startTransition(() => {
+                if (folder_id) {
+                    setFolderScans((prev) => ({
+                        ...prev,
+                        [folder_id]: {
+                            label: folder_label || (prev[folder_id]?.label ?? folder_id),
+                            scanned: scanned ?? prev[folder_id]?.scanned ?? 0,
+                            total: total ?? prev[folder_id]?.total ?? 0,
+                            current_file: current_file || '',
+                        },
+                    }));
+                }
+                setScanStatus((prev) => ({
+                    is_scanning: true,
+                    files_found: (prev.files_found || 0) + 1,
+                }));
+            });
         } else if (
             event.type === 'scan:folder:completed' ||
             event.type === 'scan:folder:complete'
@@ -126,17 +168,30 @@ export const NotificationsProvider = ({ children }) => {
                 db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
             }));
         } else if (event.type === 'ai:progress') {
+            // Low-priority: AI progress must not block user interaction
+            startTransition(() => {
+                setAiStatus((prev) => ({
+                    is_running: true,
+                    processed_files: event.payload.analysed,
+                    total_files: event.payload.total,
+                    current_file: event.payload.current_file || '',
+                    db_total: event.payload.db_total ?? prev.db_total ?? 0,
+                    db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
+                }));
+            });
+        } else if (event.type === 'ai:paused') {
             setAiStatus((prev) => ({
-                is_running: true,
-                processed_files: event.payload.analysed,
-                total_files: event.payload.total,
-                current_file: event.payload.current_file || '',
+                ...prev,
+                is_running: false,
+                paused: true,
+                current_file: '',
                 db_total: event.payload.db_total ?? prev.db_total ?? 0,
                 db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
             }));
         } else if (event.type === 'ai:completed' || event.type === 'ai:error') {
             setAiStatus((prev) => ({
                 is_running: false,
+                paused: false,
                 processed_files: 0,
                 total_files: 0,
                 current_file: '',
@@ -150,7 +205,10 @@ export const NotificationsProvider = ({ children }) => {
             const key = event.payload?.folder_id
                 ? `${event.type}:${event.payload.folder_id}`
                 : event.type;
-            setLiveProgress((prev) => ({ ...prev, [key]: event }));
+            // Low-priority update — must not block user interactions
+            startTransition(() => {
+                setLiveProgress((prev) => ({ ...prev, [key]: event }));
+            });
         } else {
             // Terminal events clear their corresponding progress entry
             if (event.type === 'scan:completed' || event.type === 'scan:error') {
@@ -189,6 +247,12 @@ export const NotificationsProvider = ({ children }) => {
                         const n = { ...prev };
                         delete n[`scan:folder:progress:${fid}`];
                         delete n[`scan:cancelling:${fid}`];
+                        // Remove from folderScans too
+                        setFolderScans((prevScans) => {
+                            const next = { ...prevScans };
+                            delete next[fid];
+                            return next;
+                        });
                         // If no more active folder progress entries remain, clear the navbar pill
                         const hasActive = Object.keys(n).some((k) =>
                             k.startsWith('scan:folder:progress:')
@@ -309,6 +373,7 @@ export const NotificationsProvider = ({ children }) => {
             value={{
                 notifications,
                 liveProgress,
+                folderScans,
                 unreadCount,
                 connected,
                 scanStatus,

@@ -18,7 +18,7 @@ from .schemas import (
     LoginRequest, LoginResponse, SessionResponse, AddFolderRequest, FolderResponse,
     ImageRecordResponse, ImageDetailsResponse, UpdateMetadataRequest, AppSettingsSchema,
     NotificationResponse, UserSession, SessionInfo,
-    CreateAlbumRequest, AlbumResponse, AddAlbumImagesRequest, RemoveAlbumImagesRequest, AlbumInfo
+    CreateAlbumRequest, UpdateAlbumRequest, AlbumResponse, AddAlbumImagesRequest, RemoveAlbumImagesRequest, AlbumInfo
 )
 from .services import (
     notification_service, scan_service, ai_service, generate_placeholder_thumbnail
@@ -1106,6 +1106,16 @@ def batch_analyse(body: dict):
     ai_service.trigger_batch_analysis(rerun)
     return {"message": "Batch analysis triggered"}
 
+@app.post("/api/ai/pause")
+def pause_ai():
+    ai_service.pause()
+    return {"message": "AI analysis pause requested", **ai_service.get_analysis_status()}
+
+@app.post("/api/ai/resume")
+def resume_ai():
+    ai_service.resume()
+    return {"message": "AI analysis resumed", **ai_service.get_analysis_status()}
+
 @app.post("/api/ai/analyse", response_model=ImageRecordResponse)
 def analyse_image_endpoint(body: dict):
     image_path = body.get("image_path")
@@ -1151,7 +1161,7 @@ def ping_ai(body: dict):
 def list_albums():
     with get_db() as conn:
         cursor = conn.execute("""
-            SELECT a.id, a.name, a.created_at,
+            SELECT a.id, a.name, a.description, a.created_at,
                    (SELECT COUNT(*) FROM album_images WHERE album_id = a.id) as image_count,
                    (SELECT i.thumbnail_path FROM images i
                     JOIN album_images ai ON ai.image_id = i.id
@@ -1165,6 +1175,7 @@ def list_albums():
             {
                 "id": r["id"],
                 "name": r["name"],
+                "description": r["description"],
                 "created_at": r["created_at"],
                 "image_count": r["image_count"],
                 "cover_image_thumbnail": r["cover_image_thumbnail"]
@@ -1183,8 +1194,8 @@ def create_album(req: CreateAlbumRequest):
     with get_db() as conn:
         try:
             conn.execute(
-                "INSERT INTO albums (id, name, created_at) VALUES (?, ?, ?)",
-                (album_id, req.name.strip(), created_at)
+                "INSERT INTO albums (id, name, description, created_at) VALUES (?, ?, ?, ?)",
+                (album_id, req.name.strip(), req.description.strip() if req.description else None, created_at)
             )
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=400, detail="An album with this name already exists")
@@ -1192,10 +1203,62 @@ def create_album(req: CreateAlbumRequest):
     return {
         "id": album_id,
         "name": req.name.strip(),
+        "description": req.description.strip() if req.description else None,
         "created_at": created_at,
         "image_count": 0,
         "cover_image_thumbnail": None
     }
+
+@app.patch("/api/albums/{album_id}", response_model=AlbumResponse)
+def update_album(album_id: str, req: UpdateAlbumRequest):
+    import sqlite3
+    with get_db() as conn:
+        cursor = conn.execute("SELECT * FROM albums WHERE id = ?", (album_id,))
+        album = cursor.fetchone()
+        if not album:
+            raise HTTPException(status_code=404, detail="Album not found")
+
+        updates = []
+        params = []
+        if req.name is not None:
+            if not req.name.strip():
+                raise HTTPException(status_code=400, detail="Album name cannot be empty")
+            updates.append("name = ?")
+            params.append(req.name.strip())
+        if req.description is not None:
+            updates.append("description = ?")
+            params.append(req.description.strip() if req.description.strip() else None)
+
+        if updates:
+            params.append(album_id)
+            try:
+                conn.execute(
+                    f"UPDATE albums SET {', '.join(updates)} WHERE id = ?",
+                    tuple(params)
+                )
+            except sqlite3.IntegrityError:
+                raise HTTPException(status_code=400, detail="An album with this name already exists")
+
+        # Reload
+        cursor = conn.execute("""
+            SELECT a.id, a.name, a.description, a.created_at,
+                   (SELECT COUNT(*) FROM album_images WHERE album_id = a.id) as image_count,
+                   (SELECT i.thumbnail_path FROM images i
+                    JOIN album_images ai ON ai.image_id = i.id
+                    WHERE ai.album_id = a.id AND i.trashed = 0
+                    ORDER BY i.modified_at DESC LIMIT 1) as cover_image_thumbnail
+            FROM albums a
+            WHERE a.id = ?
+        """, (album_id,))
+        r = cursor.fetchone()
+        return {
+            "id": r["id"],
+            "name": r["name"],
+            "description": r["description"],
+            "created_at": r["created_at"],
+            "image_count": r["image_count"],
+            "cover_image_thumbnail": r["cover_image_thumbnail"]
+        }
 
 @app.delete("/api/albums/{album_id}")
 def delete_album(album_id: str):

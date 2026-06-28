@@ -12,7 +12,6 @@ import {
     CheckCircle2,
     AlertCircle,
     Loader2,
-    Sparkles,
     Filter,
     FolderMinus,
     FolderSearch,
@@ -22,6 +21,15 @@ import { useNotifications } from '@/context/NotificationsContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+
+// Custom AI Icon component using the user-provided image
+const CustomAIIcon = (props) => (
+    <img
+        src="/site-images/ai-icon.png"
+        alt="AI"
+        className={`object-contain ${props.className || 'w-4 h-4'}`}
+    />
+);
 
 // ─── Event metadata ───────────────────────────────────────────────────────────
 const EVENT_META = {
@@ -106,7 +114,7 @@ const EVENT_META = {
         category: 'scan',
     },
     'ai:started': {
-        icon: Sparkles,
+        icon: CustomAIIcon,
         color: 'text-purple-500',
         bg: 'bg-purple-50 dark:bg-purple-950/40',
         border: 'border-purple-100 dark:border-purple-900/60',

@@ -106,10 +106,16 @@ class NotificationResponse(BaseModel):
 
 class CreateAlbumRequest(BaseModel):
     name: str
+    description: Optional[str] = None
+
+class UpdateAlbumRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 class AlbumResponse(BaseModel):
     id: str
     name: str
+    description: Optional[str] = None
     created_at: int
     image_count: int = 0
     cover_image_thumbnail: Optional[str] = None
