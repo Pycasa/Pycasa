@@ -27,7 +27,10 @@ function App() {
                                     <div className="min-h-screen bg-white dark:bg-[#060913] text-foreground transition-colors duration-200">
                                         <Routes>
                                             <Route path="/timeline" element={<AdminPage />} />
-                                            <Route path="/gallery" element={<AdminPage />} />
+                                            <Route
+                                                path="/gallery"
+                                                element={<Navigate to="/timeline" replace />}
+                                            />
                                             <Route path="/favorites" element={<AdminPage />} />
                                             <Route path="/albums" element={<AdminPage />} />
                                             <Route

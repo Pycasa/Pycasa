@@ -72,6 +72,7 @@ export const NotificationsProvider = ({ children }) => {
                         current_file: ai.current_file || '',
                         db_total: ai.db_total || 0,
                         db_analysed: ai.db_analysed || 0,
+                        db_failed: ai.db_failed || 0,
                     });
                 } catch (e) {
                     console.error('Failed to fetch initial AI status:', e);
@@ -166,6 +167,7 @@ export const NotificationsProvider = ({ children }) => {
                 current_file: '',
                 db_total: event.payload.db_total ?? prev.db_total ?? 0,
                 db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
+                db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
             }));
         } else if (event.type === 'ai:progress') {
             // Low-priority: AI progress must not block user interaction
@@ -177,6 +179,7 @@ export const NotificationsProvider = ({ children }) => {
                     current_file: event.payload.current_file || '',
                     db_total: event.payload.db_total ?? prev.db_total ?? 0,
                     db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
+                    db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
                 }));
             });
         } else if (event.type === 'ai:paused') {
@@ -187,6 +190,7 @@ export const NotificationsProvider = ({ children }) => {
                 current_file: '',
                 db_total: event.payload.db_total ?? prev.db_total ?? 0,
                 db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
+                db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
             }));
         } else if (event.type === 'ai:completed' || event.type === 'ai:error') {
             setAiStatus((prev) => ({
@@ -197,6 +201,7 @@ export const NotificationsProvider = ({ children }) => {
                 current_file: '',
                 db_total: event.payload.db_total ?? prev.db_total ?? 0,
                 db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
+                db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
             }));
         }
 

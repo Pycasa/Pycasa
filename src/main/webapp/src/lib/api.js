@@ -182,7 +182,8 @@ class ApiClient {
             favorite = null,
             trashed = false,
             albumId = null,
-            aiAnalysed = null
+            aiAnalysed = null,
+            aiFailed = null
         ) => {
             const params = new URLSearchParams({
                 page,
@@ -203,12 +204,18 @@ class ApiClient {
             if (favorite != null) params.append('favorite', favorite);
             if (trashed != null) params.append('trashed', trashed);
             if (aiAnalysed != null) params.append('ai_analysed', aiAnalysed);
+            if (aiFailed != null) params.append('ai_failed', aiFailed);
             return this.request(`/images?${params.toString()}`);
         },
-        getMetadata: (path = null, id = null) => {
+        getMetadata: (path = null, id = null, filters = {}) => {
             const params = new URLSearchParams();
             if (path) params.append('path', path);
             if (id) params.append('id', id);
+            Object.keys(filters).forEach((key) => {
+                if (filters[key] !== null && filters[key] !== undefined && filters[key] !== '') {
+                    params.append(key, filters[key]);
+                }
+            });
             return this.request(`/images/metadata?${params.toString()}`);
         },
         getTags: () => this.request('/images/tags'),

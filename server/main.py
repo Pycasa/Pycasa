@@ -74,8 +74,9 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     return user
 
 # Helper to map database rows to schemas
-def row_to_image_record(row, tags: List[str], albums: List[dict] = None) -> dict:
-    keys = list(row.keys()) if hasattr(row, "keys") else []
+def row_to_image_record(row, tags: List[str] = [], albums: List[dict] = []) -> dict:
+    keys = row.keys() if hasattr(row, "keys") else []
+    print(f"DEBUG row_to_image_record: {row['file_path']} | ai_analysed in DB: {row['ai_analysed']} | ai_failed in DB: {row['ai_failed'] if 'ai_failed' in keys else 'N/A'}")
     return {
         "id": row["id"],
         "file_path": row["file_path"],
@@ -89,6 +90,8 @@ def row_to_image_record(row, tags: List[str], albums: List[dict] = None) -> dict
         "created_at": row["created_at"],
         "indexed_at": row["indexed_at"],
         "ai_analysed": bool(row["ai_analysed"]),
+        "ai_failed": bool(row["ai_failed"]) if "ai_failed" in keys else False,
+        "ai_error": row["ai_error"] if "ai_error" in keys else None,
         "thumbnail_path": row["thumbnail_path"],
         "favorite": bool(row["favorite"]),
         "trashed": bool(row["trashed"]),
@@ -454,7 +457,8 @@ def list_images(
     favorite: Optional[bool] = None,
     trashed: bool = False,
     album_id: Optional[str] = None,
-    ai_analysed: Optional[bool] = None
+    ai_analysed: Optional[bool] = None,
+    ai_failed: Optional[bool] = None
 ):
     offset = (page - 1) * limit
 
@@ -499,6 +503,10 @@ def list_images(
         query += " AND ai_analysed = ?"
         params.append(1 if ai_analysed else 0)
 
+    if ai_failed is not None:
+        query += " AND ai_failed = ?"
+        params.append(1 if ai_failed else 0)
+
     # Trashed
     query += " AND trashed = ?"
     params.append(1 if trashed else 0)
@@ -515,10 +523,7 @@ def list_images(
         ext_list = [e.strip().lower() for e in extensions.split(",") if e.strip()]
         # Add period if not present
         ext_list = [e if e.startswith(".") else f".{e}" for e in ext_list]
-        placeholders = ",".join("?" for _ in ext_list)
-        query += f" AND LOWER(SUBSTR(file_path, -INSTR(REVERSE(file_path), '.'))) IN ({placeholders})"
-        # Wait, SQLite reverse function isn't always available by default.
-        # Let's filter in python or do simple LIKE OR conditions
+        # Filter using LIKE OR conditions
         or_conds = []
         for ext in ext_list:
             or_conds.append("file_path LIKE ?")
@@ -614,12 +619,87 @@ def toggle_favorite(image_id: str):
     return row_to_image_record(updated, tags, albums)
 
 @app.get("/api/images/metadata")
-def get_metadata(path: Optional[str] = None, id: Optional[str] = None):
+def get_metadata(
+    path: Optional[str] = None,
+    id: Optional[str] = None,
+    folder_id: Optional[str] = None,
+    search: Optional[str] = None,
+    tags: Optional[str] = None,
+    date_from: Optional[int] = None,
+    date_to: Optional[int] = None,
+    extensions: Optional[str] = None,
+    size_min: Optional[int] = None,
+    size_max: Optional[int] = None,
+    favorite: Optional[bool] = None,
+    ai_analysed: Optional[bool] = None,
+    ai_failed: Optional[bool] = None
+):
     if not path and not id:
-        # Date counts aggregation
+        # Date counts aggregation with filters
+        query = "SELECT modified_at FROM images WHERE 1=1"
+        params = []
+
+        if folder_id:
+            query += " AND folder_id = ?"
+            params.append(folder_id)
+
+        if search:
+            query += " AND (file_path LIKE ? OR description LIKE ?)"
+            lk = f"%{search.lower()}%"
+            params.extend([lk, lk])
+
+        if date_from:
+            query += " AND modified_at >= ?"
+            params.append(date_from)
+
+        if date_to:
+            query += " AND modified_at <= ?"
+            params.append(date_to)
+
+        if size_min is not None:
+            query += " AND file_size >= ?"
+            params.append(size_min)
+
+        if size_max is not None:
+            query += " AND file_size <= ?"
+            params.append(size_max)
+
+        if favorite is not None:
+            query += " AND favorite = ?"
+            params.append(1 if favorite else 0)
+
+        if ai_analysed is not None:
+            query += " AND ai_analysed = ?"
+            params.append(1 if ai_analysed else 0)
+
+        if ai_failed is not None:
+            query += " AND ai_failed = ?"
+            params.append(1 if ai_failed else 0)
+
+        # Trashed is always 0 for active timeline
+        query += " AND trashed = 0"
+
+        # Multi-tag filter
+        if tags:
+            tag_list = [t.strip().lower() for t in tags.split(",") if t.strip()]
+            for t in tag_list:
+                query += " AND id IN (SELECT image_id FROM image_tags WHERE tag = ?)"
+                params.append(t)
+
+        # Extension filter
+        if extensions:
+            ext_list = [e.strip().lower() for e in extensions.split(",") if e.strip()]
+            ext_list = [e if e.startswith(".") else f".{e}" for e in ext_list]
+            or_conds = []
+            for ext in ext_list:
+                or_conds.append("file_path LIKE ?")
+                params.append(f"%{ext}")
+            if or_conds:
+                query += f" AND ({' OR '.join(or_conds)})"
+
         counts = {}
         with get_db() as conn:
-            cursor = conn.execute("SELECT modified_at FROM images WHERE trashed = 0")
+            cursor = conn.execute(query, params)
             for row in cursor.fetchall():
                 mtime = row["modified_at"]
                 if mtime > 0:
@@ -856,8 +936,36 @@ def get_thumbnail(path: str):
         img_record = cursor.fetchone()
 
     thumb_file = None
-    if img_record and img_record["thumbnail_path"]:
-        thumb_file = img_record["thumbnail_path"]
+    if img_record:
+        if img_record["thumbnail_path"]:
+            thumb_file = img_record["thumbnail_path"]
+
+        # Self-healing: check if file on disk has changed compared to DB
+        if os.path.exists(path):
+            actual_size = os.path.getsize(path)
+            actual_mtime = int(os.path.getmtime(path) * 1000)
+            if actual_size != img_record["file_size"] or abs(actual_mtime - img_record["modified_at"]) > 1000:
+                logger.info(f"Detected modified file {path}. Resetting metadata and regenerating thumbnail.")
+                if thumb_file and os.path.exists(thumb_file):
+                    try:
+                        os.remove(thumb_file)
+                    except Exception as ex:
+                        logger.warning(f"Failed to remove stale thumbnail: {ex}")
+                thumb_file = None
+
+                # Update DB record
+                with get_db() as conn:
+                    conn.execute(
+                        "UPDATE images SET file_size = ?, modified_at = ?, ai_analysed = 0, ai_failed = 0, ai_error = NULL, description = NULL WHERE id = ?",
+                        (actual_size, actual_mtime, img_record["id"])
+                    )
+                    # Clear tags
+                    conn.execute("DELETE FROM image_tags WHERE image_id = ?", (img_record["id"],))
+
+                # Re-fetch updated record
+                with get_db() as conn:
+                    cursor = conn.execute("SELECT * FROM images WHERE id = ?", (img_record["id"],))
+                    img_record = cursor.fetchone()
 
     if not thumb_file or not os.path.exists(thumb_file):
         thumbs_dir = os.path.join(DB_DIR, "thumbs")
@@ -1148,6 +1256,11 @@ def analyse_image_endpoint(body: dict):
             tags = [t["tag"] for t in cursor_tags.fetchall()]
         return row_to_image_record(updated, tags)
     except Exception as e:
+        try:
+            with get_db() as conn:
+                conn.execute("UPDATE images SET ai_failed = 1, ai_error = ? WHERE id = ?", (str(e), img["id"]))
+        except Exception as db_err:
+            logger.warning(f"Failed to update image error in DB: {db_err}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/ai/models")

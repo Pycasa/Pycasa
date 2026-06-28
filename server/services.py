@@ -444,12 +444,12 @@ class FolderScanService:
             meta = self.extract_metadata(file_path)
 
             with get_db() as conn:
-                cursor = conn.execute("SELECT id FROM images WHERE file_path = ?", (file_path,))
+                cursor = conn.execute("SELECT id, file_size, modified_at FROM images WHERE file_path = ?", (file_path,))
                 existing = cursor.fetchone()
 
                 if existing:
-                    if not state.force:
-                        return # Skip if already indexed
+                    if existing["file_size"] == file_size and abs(existing["modified_at"] - modified_at) <= 1000 and not state.force:
+                        return # Skip if size and mtime match
                     conn.execute("DELETE FROM images WHERE id = ?", (existing["id"],))
 
                 img_id = "img_" + uuid.uuid4().hex
@@ -574,12 +574,15 @@ class AiService:
     def get_analysis_status(self) -> dict:
         db_total = 0
         db_analysed = 0
+        db_failed = 0
         try:
             with get_db() as conn:
                 cursor_total = conn.execute("SELECT COUNT(*) as count FROM images WHERE trashed = 0")
                 db_total = cursor_total.fetchone()["count"]
                 cursor_analysed = conn.execute("SELECT COUNT(*) as count FROM images WHERE ai_analysed = 1 AND trashed = 0")
                 db_analysed = cursor_analysed.fetchone()["count"]
+                cursor_failed = conn.execute("SELECT COUNT(*) as count FROM images WHERE ai_failed = 1 AND trashed = 0")
+                db_failed = cursor_failed.fetchone()["count"]
         except Exception as e:
             logger.warning(f"Failed to query overall AI stats: {e}")
 
@@ -597,7 +600,8 @@ class AiService:
                 "status": self.current_status,
                 "current_file": self.current_file,
                 "db_total": db_total,
-                "db_analysed": db_analysed
+                "db_analysed": db_analysed,
+                "db_failed": db_failed
             }
 
     def _get_db_stats(self) -> tuple:
@@ -605,10 +609,11 @@ class AiService:
             with get_db() as conn:
                 total = conn.execute("SELECT COUNT(*) as count FROM images WHERE trashed = 0").fetchone()["count"]
                 analysed = conn.execute("SELECT COUNT(*) as count FROM images WHERE ai_analysed = 1 AND trashed = 0").fetchone()["count"]
-                return total, analysed
+                failed = conn.execute("SELECT COUNT(*) as count FROM images WHERE ai_failed = 1 AND trashed = 0").fetchone()["count"]
+                return total, analysed, failed
         except Exception as e:
             logger.warning(f"Failed to query database stats: {e}")
-            return 0, 0
+            return 0, 0, 0
 
     def trigger_batch_analysis(self, rerun: bool):
         with self.lock:
@@ -634,7 +639,7 @@ class AiService:
                 self.total = len(images)
                 self.analysed = 0
 
-            db_total, db_analysed = self._get_db_stats()
+            db_total, db_analysed, db_failed = self._get_db_stats()
             notification_service.broadcast(
                 "ai:started",
                 {
@@ -642,7 +647,8 @@ class AiService:
                     "total": len(images),
                     "rerun": rerun,
                     "db_total": db_total,
-                    "db_analysed": db_analysed
+                    "db_analysed": db_analysed,
+                    "db_failed": db_failed
                 }
             )
 
@@ -662,7 +668,7 @@ class AiService:
                     logger.info("AI batch analysis paused by user request")
                     with self.lock:
                         self.current_status = "paused"
-                    db_total, db_analysed = self._get_db_stats()
+                    db_total, db_analysed, db_failed = self._get_db_stats()
                     notification_service.broadcast(
                         "ai:paused",
                         {
@@ -670,7 +676,8 @@ class AiService:
                             "analysed": self.analysed,
                             "total": self.total,
                             "db_total": db_total,
-                            "db_analysed": db_analysed
+                            "db_analysed": db_analysed,
+                            "db_failed": db_failed
                         }
                     )
                     return  # Exit thread; resume() will start a new one
@@ -685,11 +692,22 @@ class AiService:
                     self.analyse_image(img["id"], file_path, settings)
                 except Exception as e:
                     logger.warning(f"Failed to analyse image {file_path}: {e}")
+                    try:
+                        with get_db() as conn:
+                            conn.execute("UPDATE images SET ai_failed = 1, ai_error = ? WHERE id = ?", (str(e), img["id"]))
+                    except Exception as db_err:
+                        logger.warning(f"Failed to update image error in DB: {db_err}")
+
+                    db_total, db_analysed, db_failed = self._get_db_stats()
+
                     notification_service.broadcast(
                         "ai:error",
                         {
                             "message": f"Failed: {filename}",
-                            "detail": str(e)
+                            "detail": str(e),
+                            "db_total": db_total,
+                            "db_analysed": db_analysed,
+                            "db_failed": db_failed
                         }
                     )
 
@@ -701,7 +719,7 @@ class AiService:
                 now = time.time()
                 if now - last_progress_broadcast >= 1.0:
                     last_progress_broadcast = now
-                    db_total, db_analysed = self._get_db_stats()
+                    db_total, db_analysed, db_failed = self._get_db_stats()
                     notification_service.broadcast(
                         "ai:progress",
                         {
@@ -709,7 +727,8 @@ class AiService:
                             "total": self.total,
                             "current_file": filename,
                             "db_total": db_total,
-                            "db_analysed": db_analysed
+                            "db_analysed": db_analysed,
+                            "db_failed": db_failed
                         }
                     )
 
@@ -720,7 +739,7 @@ class AiService:
             # Clear the paused flag when we complete naturally
             self._write_paused_to_db(False)
 
-            db_total, db_analysed = self._get_db_stats()
+            db_total, db_analysed, db_failed = self._get_db_stats()
             notification_service.broadcast(
                 "ai:completed",
                 {
@@ -817,7 +836,7 @@ class AiService:
         # Save to DB
         with get_db() as conn:
             conn.execute(
-                "UPDATE images SET description = ?, ai_analysed = 1 WHERE id = ?",
+                "UPDATE images SET description = ?, ai_analysed = 1, ai_failed = 0, ai_error = NULL WHERE id = ?",
                 (description, img_id)
             )
             # Clear old tags

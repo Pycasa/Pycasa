@@ -51,6 +51,8 @@ class ImageRecordResponse(BaseModel):
     created_at: int
     indexed_at: int
     ai_analysed: bool
+    ai_failed: bool = False
+    ai_error: Optional[str] = None
     thumbnail_path: Optional[str] = None
     favorite: bool
     trashed: bool

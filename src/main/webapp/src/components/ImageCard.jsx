@@ -86,8 +86,8 @@ const ImageCard = ({ image, isSelected, onSelect, rowHeight = 180, onFavoriteTog
                     : ''
             } ${isBeingAnalyzed ? 'analyzed-image-blink scale-[1.02] z-10' : ''}`}
             style={{
-                flexGrow: aspectRatio,
-                flexShrink: 1,
+                flexGrow: 0,
+                flexShrink: 0,
                 flexBasis: `${aspectRatio * rowHeight}px`,
                 width: `${aspectRatio * rowHeight}px`,
                 height: `${rowHeight}px`,

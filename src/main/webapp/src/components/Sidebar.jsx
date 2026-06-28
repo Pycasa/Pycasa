@@ -21,6 +21,8 @@ import {
     Play,
     Pause,
     Loader2,
+    AlertCircle,
+    Aperture,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -84,10 +86,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
     }, []);
 
     // Main Section items
-    const mainNavItems = [
-        { id: 'timeline', label: 'Photos', icon: Calendar, path: '/timeline' },
-        { id: 'gallery', label: 'Gallery', icon: ImageIcon, path: '/gallery' },
-    ];
+    const mainNavItems = [{ id: 'timeline', label: 'Photos', icon: Calendar, path: '/timeline' }];
 
     // Library Section items (matches modern)
     const libraryNavItems = [
@@ -152,7 +151,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                                         : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/[0.06]'
                                 }`}
                             >
-                                <Icon
+                                <Aperture
                                     className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
                                 />
                                 {!isCollapsed && <span className="truncate">{item.label}</span>}
@@ -415,7 +414,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                                 <TooltipTrigger asChild>
                                     <div
                                         onClick={() => {
-                                            navigate('/gallery?ai=true');
+                                            navigate('/timeline?ai=true');
                                             if (onItemClick) onItemClick();
                                         }}
                                         className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
@@ -450,31 +449,47 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                                                 )}
                                                 {statusLabel}
                                             </span>
-                                            {/* Play / Pause button */}
-                                            {total > 0 && !isCollapsed && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handlePlayPause();
-                                                    }}
-                                                    title={
-                                                        isRunning
-                                                            ? 'Pause AI analysis'
-                                                            : 'Start / Resume AI analysis'
-                                                    }
-                                                    className={`flex items-center justify-center w-5 h-5 rounded-full transition-all ${
-                                                        isRunning
-                                                            ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
-                                                            : 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
-                                                    }`}
-                                                >
-                                                    {isRunning ? (
-                                                        <Pause className="w-2.5 h-2.5" />
-                                                    ) : (
-                                                        <Play className="w-2.5 h-2.5" />
-                                                    )}
-                                                </button>
-                                            )}
+                                            <div className="flex items-center gap-1.5">
+                                                {/* Red warning button for failed files */}
+                                                {aiStatus?.db_failed > 0 && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate('/timeline?ai_failed=true');
+                                                            if (onItemClick) onItemClick();
+                                                        }}
+                                                        title={`${aiStatus.db_failed} AI analysis failed files. Click to view.`}
+                                                        className="flex items-center justify-center w-5 h-5 rounded-full bg-red-500/15 text-red-500 hover:bg-red-500/25 animate-pulse"
+                                                    >
+                                                        <AlertCircle className="w-2.5 h-2.5" />
+                                                    </button>
+                                                )}
+                                                {/* Play / Pause button */}
+                                                {total > 0 && !isCollapsed && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handlePlayPause();
+                                                        }}
+                                                        title={
+                                                            isRunning
+                                                                ? 'Pause AI analysis'
+                                                                : 'Start / Resume AI analysis'
+                                                        }
+                                                        className={`flex items-center justify-center w-5 h-5 rounded-full transition-all ${
+                                                            isRunning
+                                                                ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
+                                                                : 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
+                                                        }`}
+                                                    >
+                                                        {isRunning ? (
+                                                            <Pause className="w-2.5 h-2.5" />
+                                                        ) : (
+                                                            <Play className="w-2.5 h-2.5" />
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </TooltipTrigger>
@@ -485,8 +500,11 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                                 >
                                     <p className="font-semibold text-indigo-400">Pycasa AI</p>
                                     <p className="text-zinc-300 leading-relaxed">
-                                        {analysed} of {total} images analysed ({percent}%). Pycasa
-                                        AI processes images in the background to generate
+                                        {analysed} of {total} images analysed ({percent}%)
+                                        {aiStatus?.db_failed > 0
+                                            ? `, ${aiStatus.db_failed} failed`
+                                            : ''}
+                                        . Pycasa AI processes images in the background to generate
                                         descriptions and tags for smart search.
                                     </p>
                                     {isPaused && (

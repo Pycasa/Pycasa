@@ -25,6 +25,7 @@ import {
     Camera,
     Aperture,
     MapPin,
+    AlertCircle,
 } from 'lucide-react';
 import { Map, Marker } from 'pigeon-maps';
 import { api } from '@/lib/api';
@@ -339,6 +340,7 @@ const ImageDetailModal = ({
             if (onUpdate) onUpdate();
         } catch (err) {
             toast({ title: 'Analysis failed', variant: 'destructive', description: err.message });
+            if (onUpdate) onUpdate();
         } finally {
             setIsAnalysing(false);
         }
@@ -656,9 +658,11 @@ const ImageDetailModal = ({
                         title={
                             isBeingAnalyzed
                                 ? 'AI analysis in progress…'
-                                : image?.ai_analysed
-                                  ? 'AI analysis complete'
-                                  : 'Not yet AI analysed'
+                                : image?.ai_failed
+                                  ? `AI analysis failed: ${image?.ai_error || 'Unknown error'}`
+                                  : image?.ai_analysed
+                                    ? 'AI analysis complete'
+                                    : 'Not yet AI analysed'
                         }
                         className="flex items-center justify-center w-8 h-8 rounded-full select-none cursor-default"
                     >
@@ -1154,13 +1158,17 @@ const ImageDetailModal = ({
                                     className={`flex items-center gap-2 mb-3 px-3 py-2 rounded-xl text-xs font-medium border ${
                                         isBeingAnalyzed
                                             ? 'bg-amber-500/10 border-amber-400/30 text-amber-300'
-                                            : image?.ai_analysed
-                                              ? 'bg-indigo-600/10 border-indigo-400/20 text-indigo-300'
-                                              : 'bg-white/[0.03] border-white/[0.06] text-gray-500'
+                                            : image?.ai_failed
+                                              ? 'bg-red-500/10 border-red-400/20 text-red-400'
+                                              : image?.ai_analysed
+                                                ? 'bg-indigo-600/10 border-indigo-400/20 text-indigo-300'
+                                                : 'bg-white/[0.03] border-white/[0.06] text-gray-500'
                                     }`}
                                 >
                                     {isBeingAnalyzed ? (
                                         <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                                    ) : image?.ai_failed ? (
+                                        <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
                                     ) : image?.ai_analysed ? (
                                         <img
                                             src="/site-images/ai-icon.png"
@@ -1177,9 +1185,11 @@ const ImageDetailModal = ({
                                     <span>
                                         {isBeingAnalyzed
                                             ? 'AI analysis in progress…'
-                                            : image?.ai_analysed
-                                              ? 'AI analysis complete'
-                                              : 'Not yet analysed'}
+                                            : image?.ai_failed
+                                              ? `AI analysis failed: ${image?.ai_error || 'Unknown error'}`
+                                              : image?.ai_analysed
+                                                ? 'AI analysis complete'
+                                                : 'Not yet analysed'}
                                     </span>
                                 </div>
 

@@ -238,6 +238,8 @@ def init_db():
             ("latitude", "REAL"),
             ("longitude", "REAL"),
             ("location_name", "TEXT"),
+            ("ai_error", "TEXT"),
+            ("ai_failed", "INTEGER DEFAULT 0"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE images ADD COLUMN {col} {col_type};")
