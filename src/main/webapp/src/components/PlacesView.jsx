@@ -52,10 +52,6 @@ function clusterPoints(points, zoom, pixelRadius = 50) {
 }
 
 const mapProviders = {
-    dark: (x, y, z) => {
-        const s = ['a', 'b', 'c'][Math.abs(x + y) % 3];
-        return `https://${s}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`;
-    },
     roadmap: (x, y, z) => `https://mt1.google.com/vt/lyrs=m&x=${x}&y=${y}&z=${z}`,
     hybrid: (x, y, z) => `https://mt1.google.com/vt/lyrs=y&x=${x}&y=${y}&z=${z}`,
     terrain: (x, y, z) => `https://mt1.google.com/vt/lyrs=t&x=${x}&y=${y}&z=${z}`,
@@ -79,23 +75,22 @@ function formatDate(ts) {
 const PlacesView = () => {
     const [points, setPoints] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [zoom, setZoom] = useState(3);
+    // Current zoom and center used for clustering, UI display, and map control.
     const [center, setCenter] = useState([20, 0]);
+    const [zoom, setZoom] = useState(3);
+
     const [selectedCluster, setSelectedCluster] = useState(null); // cluster whose images to show
     const [selectedImage, setSelectedImage] = useState(null); // image open in detail modal
     const [hoveredCluster, setHoveredCluster] = useState(null);
     const [mapStyle, setMapStyle] = useState(() => {
-        return localStorage.getItem('pycasa-map-style') || 'hybrid';
+        const saved = localStorage.getItem('pycasa-map-style');
+        return saved && mapProviders[saved] ? saved : 'hybrid';
     });
 
     const handleMapStyleChange = (style) => {
         setMapStyle(style);
         localStorage.setItem('pycasa-map-style', style);
     };
-
-    // Track last zoom applied to avoid double-firing from controlled re-render
-    const lastZoomRef = React.useRef(3);
-    const lastCenterRef = React.useRef([20, 0]);
 
     useEffect(() => {
         const load = async () => {
@@ -107,8 +102,7 @@ const PlacesView = () => {
                     const avgLat = data.reduce((s, p) => s + p.lat, 0) / data.length;
                     const avgLng = data.reduce((s, p) => s + p.lng, 0) / data.length;
                     const initZoom = data.length === 1 ? 12 : 3;
-                    lastZoomRef.current = initZoom;
-                    lastCenterRef.current = [avgLat, avgLng];
+
                     setCenter([avgLat, avgLng]);
                     setZoom(initZoom);
                 }
@@ -127,29 +121,16 @@ const PlacesView = () => {
     }, [points, zoom]);
 
     const handleBoundsChanged = useCallback(({ center: c, zoom: z }) => {
-        const roundedZ = Math.round(z);
-        // Only update state if values actually changed — prevents the controlled-prop
-        // feedback loop that caused every zoom/pan to fire twice
-        if (roundedZ !== lastZoomRef.current) {
-            lastZoomRef.current = roundedZ;
-            setZoom(roundedZ);
-        }
-        if (
-            Math.abs(c[0] - lastCenterRef.current[0]) > 0.0001 ||
-            Math.abs(c[1] - lastCenterRef.current[1]) > 0.0001
-        ) {
-            lastCenterRef.current = c;
-            setCenter(c);
-        }
+        setCenter(c);
+        setZoom(z);
     }, []);
 
     const handleClusterClick = useCallback((cluster) => {
         // Always show the photo panel for any cluster or single point
         setSelectedCluster(cluster);
-        // Also pan map to the cluster center
-        const newCenter = [cluster.lat, cluster.lng];
-        lastCenterRef.current = newCenter;
-        setCenter(newCenter);
+
+        // Programmatically pan map to the cluster center
+        setCenter([cluster.lat, cluster.lng]);
     }, []);
 
     const thumbnailUrl = useCallback((img) => api.images.getThumbnail(img.file_path), []);
@@ -255,7 +236,7 @@ const PlacesView = () => {
                             {[
                                 { id: 'hybrid', label: 'Satellite' },
                                 { id: 'roadmap', label: 'Google Maps' },
-                                { id: 'dark', label: 'Dark Mode' },
+                                { id: 'terrain', label: 'Terrain' },
                             ].map((style) => (
                                 <button
                                     key={style.id}
@@ -276,7 +257,7 @@ const PlacesView = () => {
                                 Z
                             </span>
                             <span className="text-white/80 text-xs font-bold tabular-nums">
-                                {zoom}
+                                {Math.round(zoom)}
                             </span>
                         </div>
                     </div>
@@ -287,34 +268,8 @@ const PlacesView = () => {
                     zoom={zoom}
                     onBoundsChanged={handleBoundsChanged}
                     provider={mapProviders[mapStyle]}
-                    attribution={
-                        <span className="text-[10px] text-white/30">
-                            {mapStyle === 'dark' ? (
-                                <>
-                                    ©{' '}
-                                    <a
-                                        href="https://carto.com"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-white/40 hover:text-white/60"
-                                    >
-                                        CartoDB
-                                    </a>{' '}
-                                    ©{' '}
-                                    <a
-                                        href="https://openstreetmap.org"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-white/40 hover:text-white/60"
-                                    >
-                                        OSM
-                                    </a>
-                                </>
-                            ) : (
-                                <span className="text-white/40">© Google Maps</span>
-                            )}
-                        </span>
-                    }
+                    zoomSnap={false}
+                    attribution={<span className="text-[10px] text-white/40">© Google Maps</span>}
                     style={{ height: '100%', width: '100%' }}
                 >
                     {clusters.map((cluster) => (
