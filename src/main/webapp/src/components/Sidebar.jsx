@@ -407,10 +407,23 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                             statusColor = 'text-slate-400 dark:text-white/40';
                         }
 
+                        const isAiActive =
+                            location.pathname === '/gallery' && location.search.includes('ai=true');
+
                         return (
                             <Tooltip delayDuration={300}>
                                 <TooltipTrigger asChild>
-                                    <div className="bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.06] cursor-help transition-colors hover:bg-slate-200/50 dark:hover:bg-white/[0.08]">
+                                    <div
+                                        onClick={() => {
+                                            navigate('/gallery?ai=true');
+                                            if (onItemClick) onItemClick();
+                                        }}
+                                        className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
+                                            isAiActive
+                                                ? 'bg-indigo-500/10 border-indigo-500/30 dark:bg-indigo-500/15 dark:border-indigo-500/40'
+                                                : 'bg-slate-200/30 dark:bg-white/[0.04] border-slate-200/80 dark:border-white/[0.06] hover:bg-slate-200/50 dark:hover:bg-white/[0.08]'
+                                        }`}
+                                    >
                                         <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">
                                             <span className="flex items-center gap-1.5 select-none">
                                                 <img

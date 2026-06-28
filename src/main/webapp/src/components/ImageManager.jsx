@@ -59,7 +59,9 @@ const SIZE_PRESETS = [
 
 const ImageManager = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const queryParam = new URLSearchParams(location.search).get('q') || '';
+    const showAiOnly = new URLSearchParams(location.search).get('ai') === 'true';
 
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -127,6 +129,7 @@ const ImageManager = () => {
         dateTo,
         selectedExtGroups,
         sizePresetIdx,
+        showAiOnly,
     ]);
 
     const fetchInitialData = async () => {
@@ -177,7 +180,11 @@ const ImageManager = () => {
                 dateToMs,
                 extensions,
                 sizeMin,
-                sizeMax
+                sizeMax,
+                null, // favorite
+                false, // trashed
+                null, // albumId
+                showAiOnly ? true : null // aiAnalysed
             );
 
             if (Array.isArray(newImages)) {
@@ -263,6 +270,7 @@ const ImageManager = () => {
         setDateTo('');
         setSelectedExtGroups([]);
         setSizePresetIdx(0);
+        navigate('/gallery');
     };
 
     const hasActiveFilters =
@@ -272,7 +280,8 @@ const ImageManager = () => {
         dateFrom ||
         dateTo ||
         selectedExtGroups.length > 0 ||
-        sizePresetIdx !== 0;
+        sizePresetIdx !== 0 ||
+        showAiOnly;
 
     const modalImage = useMemo(() => {
         if (!selectedImage) return null;
@@ -648,6 +657,28 @@ const ImageManager = () => {
                         </PopoverContent>
                     </Popover>
 
+                    {/* ── AI Analysed Filter ── */}
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            const params = new URLSearchParams(location.search);
+                            if (showAiOnly) {
+                                params.delete('ai');
+                            } else {
+                                params.set('ai', 'true');
+                            }
+                            navigate(`/gallery?${params.toString()}`);
+                        }}
+                        className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${showAiOnly ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/20 font-semibold' : 'text-slate-600 dark:text-white/60'}`}
+                    >
+                        <img
+                            src="/site-images/ai-icon.png"
+                            alt="AI"
+                            className="w-4 h-4 mr-2 object-contain"
+                        />
+                        AI Analysed
+                    </Button>
+
                     {hasActiveFilters && (
                         <Button
                             variant="ghost"
@@ -665,8 +696,28 @@ const ImageManager = () => {
                 {(selectedTags.length > 0 ||
                     selectedExtGroups.length > 0 ||
                     dateActive ||
-                    sizeActive) && (
+                    sizeActive ||
+                    showAiOnly) && (
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
+                        {showAiOnly && (
+                            <Badge
+                                variant="default"
+                                className="bg-white dark:bg-white/[0.07] text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                onClick={() => {
+                                    const params = new URLSearchParams(location.search);
+                                    params.delete('ai');
+                                    navigate(`/gallery?${params.toString()}`);
+                                }}
+                            >
+                                <img
+                                    src="/site-images/ai-icon.png"
+                                    alt="AI"
+                                    className="w-3 h-3 object-contain"
+                                />
+                                AI Analysed Only
+                                <X className="w-3 h-3 text-slate-400 group-hover:text-red-500" />
+                            </Badge>
+                        )}
                         {selectedTags.map((tag) => (
                             <Badge
                                 key={tag}

@@ -181,7 +181,8 @@ class ApiClient {
             sizeMax = null,
             favorite = null,
             trashed = false,
-            albumId = null
+            albumId = null,
+            aiAnalysed = null
         ) => {
             const params = new URLSearchParams({
                 page,
@@ -201,6 +202,7 @@ class ApiClient {
             if (sizeMax != null) params.append('size_max', sizeMax);
             if (favorite != null) params.append('favorite', favorite);
             if (trashed != null) params.append('trashed', trashed);
+            if (aiAnalysed != null) params.append('ai_analysed', aiAnalysed);
             return this.request(`/images?${params.toString()}`);
         },
         getMetadata: (path = null, id = null) => {

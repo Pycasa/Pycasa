@@ -453,7 +453,8 @@ def list_images(
     size_max: Optional[int] = None,
     favorite: Optional[bool] = None,
     trashed: bool = False,
-    album_id: Optional[str] = None
+    album_id: Optional[str] = None,
+    ai_analysed: Optional[bool] = None
 ):
     offset = (page - 1) * limit
 
@@ -493,6 +494,10 @@ def list_images(
     if favorite is not None:
         query += " AND favorite = ?"
         params.append(1 if favorite else 0)
+
+    if ai_analysed is not None:
+        query += " AND ai_analysed = ?"
+        params.append(1 if ai_analysed else 0)
 
     # Trashed
     query += " AND trashed = ?"
