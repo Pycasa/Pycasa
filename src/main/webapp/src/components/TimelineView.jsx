@@ -4,7 +4,16 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { api } from '@/lib/api';
 import ImageCard from './ImageCard';
 import ImageDetailModal from './ImageDetailModal';
-import { Calendar, Loader2, ArrowLeft } from 'lucide-react';
+import {
+    Calendar,
+    Loader2,
+    ArrowLeft,
+    SlidersHorizontal,
+    Folder,
+    Tag,
+    Heart,
+    Edit2,
+} from 'lucide-react';
 
 const KNOWN_EXTENSIONS = [
     { group: 'JPEG', exts: ['jpg', 'jpeg'] },
@@ -320,11 +329,17 @@ const TimelineView = () => {
             sizePresetIdx: params.get('size') ? parseInt(params.get('size'), 10) : 0,
             aiOnly: params.get('ai') === 'true',
             aiFailed: params.get('ai_failed') === 'true',
+            faceFailed: params.get('face_failed') === 'true',
+            personName: params.get('person') || '',
+            faceId: params.get('face_id') || '',
         };
     }, [location.search]);
 
     const [metadata, setMetadata] = useState(null);
     const [metadataLoading, setMetadataLoading] = useState(true);
+    const [personFaceId, setPersonFaceId] = useState(null);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editNameValue, setEditNameValue] = useState('');
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedImageIndex, setSelectedImageIndex] = useState(null);
@@ -379,7 +394,11 @@ const TimelineView = () => {
                     false, // trashed
                     null, // albumId
                     queryParams.aiOnly ? true : null,
-                    queryParams.aiFailed ? true : null
+                    queryParams.aiFailed ? true : null,
+                    null, // faceAnalysed
+                    queryParams.faceFailed ? true : null,
+                    queryParams.personName || null,
+                    queryParams.faceId || null
                 );
                 if (Array.isArray(newImages)) {
                     const startIndex = (pageNum - 1) * limit;
@@ -521,6 +540,9 @@ const TimelineView = () => {
                 size_max: sizeMax,
                 ai_analysed: queryParams.aiOnly ? true : null,
                 ai_failed: queryParams.aiFailed ? true : null,
+                face_failed: queryParams.faceFailed ? true : null,
+                person: queryParams.personName || null,
+                face_id: queryParams.faceId || null,
             });
             setMetadata(meta);
             setMetadataLoading(false);
@@ -533,9 +555,43 @@ const TimelineView = () => {
         }
     }, [fetchImages, queryParams]);
 
+    const handleSaveName = async () => {
+        const trimmed = editNameValue.trim();
+        setIsEditingName(false);
+        if (!trimmed || trimmed === queryParams.personName) return;
+
+        if (faceIdToShow) {
+            try {
+                await api.face.updateFaceName(faceIdToShow, trimmed);
+                navigate(`/timeline?person=${encodeURIComponent(trimmed)}`);
+            } catch (err) {
+                console.error('Failed to rename person:', err);
+            }
+        }
+    };
+
     useEffect(() => {
         loadTimeline();
     }, [loadTimeline]);
+
+    useEffect(() => {
+        if (queryParams.personName) {
+            api.face
+                .listFaces()
+                .then((faces) => {
+                    const match = faces.find(
+                        (f) =>
+                            f.name && f.name.toLowerCase() === queryParams.personName.toLowerCase()
+                    );
+                    if (match) {
+                        setPersonFaceId(match.id);
+                    }
+                })
+                .catch(() => {});
+        } else {
+            setPersonFaceId(null);
+        }
+    }, [queryParams.personName]);
 
     useEffect(() => {
         const handleUpload = () => {
@@ -819,11 +875,16 @@ const TimelineView = () => {
 
     const virtualItems = rowVirtualizer.getVirtualItems();
     const totalSize = rowVirtualizer.getTotalSize();
+    const faceIdToShow = queryParams.faceId || personFaceId;
 
     return (
         <div className="relative flex flex-col flex-grow h-[calc(100vh-4rem)] bg-white dark:bg-slate-950 overflow-hidden">
             {/* Header for Filtered Views (AI Failed / AI Only) */}
-            {(queryParams.aiFailed || queryParams.aiOnly) && (
+            {(queryParams.aiFailed ||
+                queryParams.aiOnly ||
+                queryParams.faceFailed ||
+                queryParams.personName ||
+                queryParams.faceId) && (
                 <div className="flex items-center justify-between px-6 py-3.5 bg-slate-50/80 dark:bg-slate-900/40 border-b border-slate-200 dark:border-white/[0.06] shrink-0 backdrop-blur-md">
                     <div className="flex items-center gap-3">
                         <button
@@ -833,14 +894,68 @@ const TimelineView = () => {
                         >
                             <ArrowLeft className="w-4 h-4" />
                         </button>
-                        <span className="text-sm font-extrabold text-slate-800 dark:text-white/90">
-                            {queryParams.aiFailed
-                                ? 'AI Analysis Failed Files'
-                                : 'AI Analysed Photos'}
-                            <span className="ml-2 text-xs font-bold text-slate-450 dark:text-white/30">
-                                {totalImageCount} {totalImageCount === 1 ? 'file' : 'files'}
-                            </span>
-                        </span>
+                        <div className="flex items-center gap-2.5">
+                            {faceIdToShow && (
+                                <img
+                                    src={api.face.getFaceThumbnailUrl(faceIdToShow)}
+                                    alt="Face"
+                                    className="w-[72px] h-[72px] rounded-full object-cover border-2 border-slate-200 dark:border-white/15 shadow-md shrink-0"
+                                />
+                            )}
+                            <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                    {queryParams.personName ? (
+                                        isEditingName ? (
+                                            <input
+                                                type="text"
+                                                value={editNameValue}
+                                                onChange={(e) => setEditNameValue(e.target.value)}
+                                                onBlur={handleSaveName}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleSaveName();
+                                                    }
+                                                    if (e.key === 'Escape') {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setIsEditingName(false);
+                                                    }
+                                                }}
+                                                className="text-sm font-extrabold bg-slate-150 dark:bg-zinc-900 border border-indigo-500 rounded px-2 py-0.5 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <span
+                                                onClick={() => {
+                                                    setIsEditingName(true);
+                                                    setEditNameValue(queryParams.personName);
+                                                }}
+                                                className="text-sm font-extrabold text-slate-800 dark:text-white/90 hover:text-indigo-500 dark:hover:text-indigo-400 cursor-pointer flex items-center gap-1.5 group/title"
+                                                title="Click to rename"
+                                            >
+                                                {queryParams.personName}
+                                                <Edit2 className="w-3.5 h-3.5 opacity-0 group-hover/title:opacity-100 transition-opacity text-slate-400" />
+                                            </span>
+                                        )
+                                    ) : (
+                                        <span className="text-sm font-extrabold text-slate-800 dark:text-white/90">
+                                            {queryParams.aiFailed
+                                                ? 'AI Analysis Failed Files'
+                                                : queryParams.faceFailed
+                                                  ? 'Face Detection Failed Images'
+                                                  : queryParams.faceId
+                                                    ? 'Selected Face'
+                                                    : 'AI Analysed Photos'}
+                                        </span>
+                                    )}
+                                    <span className="text-xs font-bold text-slate-450 dark:text-white/30 self-end mb-[2px]">
+                                        {totalImageCount} {totalImageCount === 1 ? 'file' : 'files'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

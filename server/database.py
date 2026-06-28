@@ -37,6 +37,7 @@ def init_db():
     os.makedirs(DB_DIR, exist_ok=True)
     os.makedirs(os.path.join(DB_DIR, "thumbs"), exist_ok=True)
     os.makedirs(os.path.join(DB_DIR, "trash"), exist_ok=True)
+    os.makedirs(os.path.join(DB_DIR, "faces"), exist_ok=True)
     os.makedirs(os.path.expanduser("~/.pycasa/uploads"), exist_ok=True)
 
     with get_db() as conn:
@@ -157,6 +158,23 @@ def init_db():
         );
         """)
 
+        # Create Faces table
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS faces (
+            id TEXT PRIMARY KEY,
+            image_id TEXT,
+            name TEXT,
+            box_top INTEGER,
+            box_right INTEGER,
+            box_bottom INTEGER,
+            box_left INTEGER,
+            thumbnail_path TEXT,
+            FOREIGN KEY(image_id) REFERENCES images(id) ON DELETE CASCADE
+        );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_id ON faces (image_id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_faces_name ON faces (name);")
+
         # Create Events table
         conn.execute("""
         CREATE TABLE IF NOT EXISTS events (
@@ -254,12 +272,24 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
-        # Add ai_paused to app_settings for persistent pause state
+        # Add face_paused to app_settings for persistent pause state
         try:
-            conn.execute("ALTER TABLE app_settings ADD COLUMN ai_paused INTEGER DEFAULT 0;")
-            logger.info("Migrated database: added ai_paused column to app_settings")
+            conn.execute("ALTER TABLE app_settings ADD COLUMN face_paused INTEGER DEFAULT 0;")
+            logger.info("Migrated database: added face_paused column to app_settings")
         except sqlite3.OperationalError:
             pass
+
+        # Add face_analysed, face_failed, face_error to images table
+        for col, col_type in [
+            ("face_analysed", "INTEGER DEFAULT 0"),
+            ("face_failed", "INTEGER DEFAULT 0"),
+            ("face_error", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE images ADD COLUMN {col} {col_type};")
+                logger.info(f"Migrated database: added {col} column to images table")
+            except sqlite3.OperationalError:
+                pass
 
         # Add description to albums table
         try:

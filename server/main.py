@@ -21,7 +21,7 @@ from .schemas import (
     CreateAlbumRequest, UpdateAlbumRequest, AlbumResponse, AddAlbumImagesRequest, RemoveAlbumImagesRequest, AlbumInfo
 )
 from .services import (
-    notification_service, scan_service, ai_service, generate_placeholder_thumbnail
+    notification_service, scan_service, ai_service, face_service, generate_placeholder_thumbnail
 )
 
 logger = logging.getLogger("pycasa.main")
@@ -74,7 +74,7 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     return user
 
 # Helper to map database rows to schemas
-def row_to_image_record(row, tags: List[str] = [], albums: List[dict] = []) -> dict:
+def row_to_image_record(row, tags: List[str] = [], albums: List[dict] = [], faces: List[dict] = []) -> dict:
     keys = row.keys() if hasattr(row, "keys") else []
     print(f"DEBUG row_to_image_record: {row['file_path']} | ai_analysed in DB: {row['ai_analysed']} | ai_failed in DB: {row['ai_failed'] if 'ai_failed' in keys else 'N/A'}")
     return {
@@ -84,6 +84,7 @@ def row_to_image_record(row, tags: List[str] = [], albums: List[dict] = []) -> d
         "description": row["description"],
         "tags": tags,
         "albums": albums or [],
+        "faces": faces or [],
         "ocr_text": row["ocr_text"],
         "file_size": row["file_size"],
         "modified_at": row["modified_at"],
@@ -92,6 +93,9 @@ def row_to_image_record(row, tags: List[str] = [], albums: List[dict] = []) -> d
         "ai_analysed": bool(row["ai_analysed"]),
         "ai_failed": bool(row["ai_failed"]) if "ai_failed" in keys else False,
         "ai_error": row["ai_error"] if "ai_error" in keys else None,
+        "face_analysed": bool(row["face_analysed"]) if "face_analysed" in keys else False,
+        "face_failed": bool(row["face_failed"]) if "face_failed" in keys else False,
+        "face_error": row["face_error"] if "face_error" in keys else None,
         "thumbnail_path": row["thumbnail_path"],
         "favorite": bool(row["favorite"]),
         "trashed": bool(row["trashed"]),
@@ -458,7 +462,11 @@ def list_images(
     trashed: bool = False,
     album_id: Optional[str] = None,
     ai_analysed: Optional[bool] = None,
-    ai_failed: Optional[bool] = None
+    ai_failed: Optional[bool] = None,
+    face_analysed: Optional[bool] = None,
+    face_failed: Optional[bool] = None,
+    person: Optional[str] = None,
+    face_id: Optional[str] = None
 ):
     offset = (page - 1) * limit
 
@@ -506,6 +514,22 @@ def list_images(
     if ai_failed is not None:
         query += " AND ai_failed = ?"
         params.append(1 if ai_failed else 0)
+
+    if face_analysed is not None:
+        query += " AND face_analysed = ?"
+        params.append(1 if face_analysed else 0)
+
+    if face_failed is not None:
+        query += " AND face_failed = ?"
+        params.append(1 if face_failed else 0)
+
+    if person:
+        query += " AND id IN (SELECT image_id FROM faces WHERE name = ?)"
+        params.append(person)
+
+    if face_id:
+        query += " AND id IN (SELECT image_id FROM faces WHERE id = ?)"
+        params.append(face_id)
 
     # Trashed
     query += " AND trashed = ?"
@@ -556,7 +580,13 @@ def list_images(
                 (row["id"],)
             )
             img_albums = [{"id": r["id"], "name": r["name"]} for r in cursor_albums.fetchall()]
-            images_res.append(row_to_image_record(row, img_tags, img_albums))
+            # Query faces for each image
+            cursor_faces = conn.execute(
+                "SELECT id, name, box_top, box_right, box_bottom, box_left FROM faces WHERE image_id = ?",
+                (row["id"],)
+            )
+            img_faces = [dict(f) for f in cursor_faces.fetchall()]
+            images_res.append(row_to_image_record(row, img_tags, img_albums, img_faces))
 
     return images_res
 
@@ -612,11 +642,17 @@ def toggle_favorite(image_id: str):
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (image_id,))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
         albums = get_image_albums(conn, image_id)
+        # Query faces
+        cursor_faces = conn.execute(
+            "SELECT id, name, box_top, box_right, box_bottom, box_left FROM faces WHERE image_id = ?",
+            (image_id,)
+        )
+        faces = [dict(f) for f in cursor_faces.fetchall()]
 
     event_type = "file:favorited" if new_fav == 1 else "file:unfavorited"
     log_event(event_type, file_path=img["file_path"], details="Marked image as favorite" if new_fav == 1 else "Removed image from favorites")
 
-    return row_to_image_record(updated, tags, albums)
+    return row_to_image_record(updated, tags, albums, faces)
 
 @app.get("/api/images/metadata")
 def get_metadata(
@@ -632,7 +668,11 @@ def get_metadata(
     size_max: Optional[int] = None,
     favorite: Optional[bool] = None,
     ai_analysed: Optional[bool] = None,
-    ai_failed: Optional[bool] = None
+    ai_failed: Optional[bool] = None,
+    face_analysed: Optional[bool] = None,
+    face_failed: Optional[bool] = None,
+    person: Optional[str] = None,
+    face_id: Optional[str] = None
 ):
     if not path and not id:
         # Date counts aggregation with filters
@@ -675,6 +715,22 @@ def get_metadata(
         if ai_failed is not None:
             query += " AND ai_failed = ?"
             params.append(1 if ai_failed else 0)
+
+        if face_analysed is not None:
+            query += " AND face_analysed = ?"
+            params.append(1 if face_analysed else 0)
+
+        if face_failed is not None:
+            query += " AND face_failed = ?"
+            params.append(1 if face_failed else 0)
+
+        if person:
+            query += " AND id IN (SELECT image_id FROM faces WHERE name = ?)"
+            params.append(person)
+
+        if face_id:
+            query += " AND id IN (SELECT image_id FROM faces WHERE id = ?)"
+            params.append(face_id)
 
         # Trashed is always 0 for active timeline
         query += " AND trashed = 0"
@@ -723,8 +779,14 @@ def get_metadata(
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (img["id"],))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
         albums = get_image_albums(conn, img["id"])
+        # Query faces
+        cursor_faces = conn.execute(
+            "SELECT id, name, box_top, box_right, box_bottom, box_left FROM faces WHERE image_id = ?",
+            (img["id"],)
+        )
+        faces = [dict(f) for f in cursor_faces.fetchall()]
 
-    return row_to_image_record(img, tags, albums)
+    return row_to_image_record(img, tags, albums, faces)
 
 @app.get("/api/images/details", response_model=ImageDetailsResponse)
 def get_details(path: str):
@@ -739,8 +801,14 @@ def get_details(path: str):
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (img["id"],))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
         albums = get_image_albums(conn, img["id"])
+        # Query faces
+        cursor_faces = conn.execute(
+            "SELECT id, name, box_top, box_right, box_bottom, box_left FROM faces WHERE image_id = ?",
+            (img["id"],)
+        )
+        faces = [dict(f) for f in cursor_faces.fetchall()]
 
-    record = row_to_image_record(img, tags, albums)
+    record = row_to_image_record(img, tags, albums, faces)
 
     # Fallback to dynamic read if DB lacks dimensions
     if not record.get("width") or not record.get("height"):
@@ -796,11 +864,17 @@ def update_metadata(req: UpdateMetadataRequest):
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (target_id,))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
         albums = get_image_albums(conn, target_id)
+        # Query faces
+        cursor_faces = conn.execute(
+            "SELECT id, name, box_top, box_right, box_bottom, box_left FROM faces WHERE image_id = ?",
+            (target_id,)
+        )
+        faces = [dict(f) for f in cursor_faces.fetchall()]
 
     if details_parts:
         log_event("metadata:updated", file_path=target_path, details=", ".join(details_parts))
 
-    return row_to_image_record(updated, tags, albums)
+    return row_to_image_record(updated, tags, albums, faces)
 
 @app.delete("/api/images")
 def delete_image(folder_id: str, path: str):
@@ -899,9 +973,15 @@ def restore_image(image_id: str):
         cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (image_id,))
         tags = [t["tag"] for t in cursor_tags.fetchall()]
         albums = get_image_albums(conn, image_id)
+        # Query faces
+        cursor_faces = conn.execute(
+            "SELECT id, name, box_top, box_right, box_bottom, box_left FROM faces WHERE image_id = ?",
+            (image_id,)
+        )
+        faces = [dict(f) for f in cursor_faces.fetchall()]
 
     log_event("file:restored", file_path=new_path, details=f"Restored image from trash to {new_path}")
-    return row_to_image_record(updated, tags, albums)
+    return row_to_image_record(updated, tags, albums, faces)
 
 @app.get("/api/images/scan-status")
 def get_scan_status():
@@ -1090,6 +1170,9 @@ async def upload_images(
                         background_tasks.add_task(
                             ai_service.analyse_image, img_id, file_path, settings_dict
                         )
+                        background_tasks.add_task(
+                            face_service.detect_faces_in_image, img_id, file_path
+                        )
         except Exception as e:
             logger.warning(f"Failed to index uploaded file {file.filename}: {e}")
 
@@ -1254,7 +1337,12 @@ def analyse_image_endpoint(body: dict):
             updated = cursor.fetchone()
             cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (img["id"],))
             tags = [t["tag"] for t in cursor_tags.fetchall()]
-        return row_to_image_record(updated, tags)
+            cursor_faces = conn.execute(
+                "SELECT id, name, box_top, box_right, box_bottom, box_left FROM faces WHERE image_id = ?",
+                (img["id"],)
+            )
+            faces = [dict(f) for f in cursor_faces.fetchall()]
+        return row_to_image_record(updated, tags, faces=faces)
     except Exception as e:
         try:
             with get_db() as conn:
@@ -1262,6 +1350,95 @@ def analyse_image_endpoint(body: dict):
         except Exception as db_err:
             logger.warning(f"Failed to update image error in DB: {db_err}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/face/detection-status")
+def get_face_detection_status():
+    return face_service.get_detection_status()
+
+@app.post("/api/face/batch-detect")
+def batch_detect_faces(body: dict):
+    rerun = body.get("rerun", False)
+    face_service.trigger_batch_detection(rerun)
+    return {"message": "Batch face detection triggered"}
+
+@app.post("/api/face/pause")
+def pause_face_detection():
+    face_service.pause()
+    return {"message": "Face detection pause requested", **face_service.get_detection_status()}
+
+@app.post("/api/face/resume")
+def resume_face_detection():
+    face_service.resume()
+    return {"message": "Face detection resumed", **face_service.get_detection_status()}
+
+@app.post("/api/face/detect", response_model=ImageRecordResponse)
+def detect_image_faces_endpoint(body: dict):
+    image_path = body.get("image_path")
+    if not image_path:
+        raise HTTPException(status_code=400, detail="image_path is required")
+
+    with get_db() as conn:
+        cursor = conn.execute("SELECT * FROM images WHERE file_path = ?", (image_path,))
+        img = cursor.fetchone()
+        if not img:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+    try:
+        face_service.detect_faces_in_image(img["id"], image_path)
+        # Reload
+        with get_db() as conn:
+            cursor = conn.execute("SELECT * FROM images WHERE id = ?", (img["id"],))
+            updated = cursor.fetchone()
+            cursor_tags = conn.execute("SELECT tag FROM image_tags WHERE image_id = ?", (img["id"],))
+            tags = [t["tag"] for t in cursor_tags.fetchall()]
+            cursor_faces = conn.execute(
+                "SELECT id, name, box_top, box_right, box_bottom, box_left FROM faces WHERE image_id = ?",
+                (img["id"],)
+            )
+            faces = [dict(f) for f in cursor_faces.fetchall()]
+        return row_to_image_record(updated, tags, faces=faces)
+    except Exception as e:
+        try:
+            with get_db() as conn:
+                conn.execute("UPDATE images SET face_failed = 1, face_error = ? WHERE id = ?", (str(e), img["id"]))
+        except Exception as db_err:
+            logger.warning(f"Failed to update image error in DB: {db_err}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/faces")
+def list_faces():
+    with get_db() as conn:
+        cursor = conn.execute(
+            """SELECT f.*, i.file_path FROM faces f
+               JOIN images i ON f.image_id = i.id
+               ORDER BY CASE WHEN f.name IS NULL OR f.name = '' THEN 1 ELSE 0 END ASC,
+                        f.name ASC,
+                        f.id DESC"""
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+@app.patch("/api/faces/{face_id}")
+def update_face_name(face_id: str, body: dict):
+    name = body.get("name")
+    with get_db() as conn:
+        row = conn.execute("SELECT name FROM faces WHERE id = ?", (face_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Face not found")
+
+        old_name = row["name"]
+        if old_name and old_name.strip():
+            conn.execute("UPDATE faces SET name = ? WHERE name = ?", (name, old_name))
+        else:
+            conn.execute("UPDATE faces SET name = ? WHERE id = ?", (name, face_id))
+    return {"message": "Face name updated successfully"}
+
+@app.get("/api/faces/{face_id}/thumbnail")
+def get_face_thumbnail(face_id: str):
+    with get_db() as conn:
+        row = conn.execute("SELECT thumbnail_path FROM faces WHERE id = ?", (face_id,)).fetchone()
+    if not row or not row["thumbnail_path"] or not os.path.exists(row["thumbnail_path"]):
+        raise HTTPException(status_code=404, detail="Face thumbnail not found")
+    return FileResponse(row["thumbnail_path"], media_type="image/jpeg")
 
 @app.get("/api/ai/models")
 def list_models(url: Optional[str] = None):

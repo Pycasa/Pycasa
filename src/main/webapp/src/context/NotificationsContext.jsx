@@ -27,6 +27,8 @@ const PROGRESS_TYPES = new Set([
     'scan:cancelling',
     'ai:progress',
     'ai:paused',
+    'face:progress',
+    'face:paused',
     'folder-delete:progress',
 ]);
 
@@ -42,6 +44,16 @@ export const NotificationsProvider = ({ children }) => {
         processed_files: 0,
         total_files: 0,
         current_file: '',
+    });
+    const [faceStatus, setFaceStatus] = useState({
+        is_running: false,
+        paused: false,
+        processed_files: 0,
+        total_files: 0,
+        current_file: '',
+        db_total: 0,
+        db_detected: 0,
+        db_failed: 0,
     });
     // Per-folder scan state: { [folder_id]: { label, scanned, total, current_file } }
     const [folderScans, setFolderScans] = useState({});
@@ -76,6 +88,21 @@ export const NotificationsProvider = ({ children }) => {
                     });
                 } catch (e) {
                     console.error('Failed to fetch initial AI status:', e);
+                }
+                try {
+                    const face = await api.face.getDetectionStatus();
+                    setFaceStatus({
+                        is_running: face.is_running || face.running,
+                        paused: face.paused || false,
+                        processed_files: face.processed_files || face.detected,
+                        total_files: face.total_files || face.total,
+                        current_file: face.current_file || '',
+                        db_total: face.db_total || 0,
+                        db_detected: face.db_detected || 0,
+                        db_failed: face.db_failed || 0,
+                    });
+                } catch (e) {
+                    console.error('Failed to fetch initial face status:', e);
                 }
             };
             fetchInitialStatuses();
@@ -203,6 +230,49 @@ export const NotificationsProvider = ({ children }) => {
                 db_analysed: event.payload.db_analysed ?? prev.db_analysed ?? 0,
                 db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
             }));
+        } else if (event.type === 'face:started') {
+            setFaceStatus((prev) => ({
+                is_running: true,
+                processed_files: 0,
+                total_files: event.payload.total || 0,
+                current_file: '',
+                db_total: event.payload.db_total ?? prev.db_total ?? 0,
+                db_detected: event.payload.db_detected ?? prev.db_detected ?? 0,
+                db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
+            }));
+        } else if (event.type === 'face:progress') {
+            startTransition(() => {
+                setFaceStatus((prev) => ({
+                    is_running: true,
+                    processed_files: event.payload.detected,
+                    total_files: event.payload.total,
+                    current_file: event.payload.current_file || '',
+                    db_total: event.payload.db_total ?? prev.db_total ?? 0,
+                    db_detected: event.payload.db_detected ?? prev.db_detected ?? 0,
+                    db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
+                }));
+            });
+        } else if (event.type === 'face:paused') {
+            setFaceStatus((prev) => ({
+                ...prev,
+                is_running: false,
+                paused: true,
+                current_file: '',
+                db_total: event.payload.db_total ?? prev.db_total ?? 0,
+                db_detected: event.payload.db_detected ?? prev.db_detected ?? 0,
+                db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
+            }));
+        } else if (event.type === 'face:completed' || event.type === 'face:error') {
+            setFaceStatus((prev) => ({
+                is_running: false,
+                paused: false,
+                processed_files: 0,
+                total_files: 0,
+                current_file: '',
+                db_total: event.payload.db_total ?? prev.db_total ?? 0,
+                db_detected: event.payload.db_detected ?? prev.db_detected ?? 0,
+                db_failed: event.payload.db_failed ?? prev.db_failed ?? 0,
+            }));
         }
 
         if (PROGRESS_TYPES.has(event.type)) {
@@ -227,6 +297,13 @@ export const NotificationsProvider = ({ children }) => {
                 setLiveProgress((prev) => {
                     const n = { ...prev };
                     delete n['ai:progress'];
+                    return n;
+                });
+            }
+            if (event.type === 'face:completed' || event.type === 'face:error') {
+                setLiveProgress((prev) => {
+                    const n = { ...prev };
+                    delete n['face:progress'];
                     return n;
                 });
             }
@@ -383,6 +460,7 @@ export const NotificationsProvider = ({ children }) => {
                 connected,
                 scanStatus,
                 aiStatus,
+                faceStatus,
                 markRead,
                 markAllRead,
                 deleteOne,

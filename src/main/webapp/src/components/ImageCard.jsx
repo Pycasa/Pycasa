@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { useAIStatus } from '@/context/AIStatusContext';
-import { Heart, Sparkles, Loader2 } from 'lucide-react';
+import { Heart, Sparkles, Loader2, ScanFace } from 'lucide-react';
 
 const ImageCard = ({ image, isSelected, onSelect, rowHeight = 180, onFavoriteToggle }) => {
     const [imgData, setImgData] = useState(image);
@@ -116,6 +116,16 @@ const ImageCard = ({ image, isSelected, onSelect, rowHeight = 180, onFavoriteTog
                             className="w-4 h-4 object-contain drop-shadow-md"
                         />
                     )}
+                </div>
+            )}
+
+            {/* Face detection badge — top-left corner */}
+            {imgData.face_analysed && (
+                <div
+                    className="absolute top-1 left-1 z-20 flex items-center justify-center p-1 pointer-events-none"
+                    title="Face detection completed"
+                >
+                    <ScanFace className="w-4 h-4 text-white drop-shadow-md" />
                 </div>
             )}
 

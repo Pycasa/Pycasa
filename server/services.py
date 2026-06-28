@@ -895,8 +895,307 @@ class AiService:
         except Exception:
             return []
 
+class FaceDetectionService:
+    def __init__(self):
+        self.detecting = False
+        self.detected = 0
+        self.total = 0
+        self.current_status = "idle"
+        self.current_file = ""
+        self.pause_requested = False
+        self.lock = threading.Lock()
+
+    def _read_paused_from_db(self) -> bool:
+        try:
+            with get_db() as conn:
+                row = conn.execute("SELECT face_paused FROM app_settings WHERE id = 'settings'").fetchone()
+                return bool(row["face_paused"]) if row else False
+        except Exception:
+            return False
+
+    def _write_paused_to_db(self, paused: bool):
+        try:
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE app_settings SET face_paused = ? WHERE id = 'settings'",
+                    (1 if paused else 0,)
+                )
+        except Exception as e:
+            logger.warning(f"Failed to persist face_paused={paused}: {e}")
+
+    def pause(self):
+        self._write_paused_to_db(True)
+        with self.lock:
+            self.pause_requested = True
+            self.current_status = "pausing"
+        db_total, db_detected, db_failed = self._get_db_stats()
+        notification_service.broadcast(
+            "face:paused",
+            {
+                "message": "Face detection paused",
+                "detected": self.detected,
+                "total": self.total,
+                "db_total": db_total,
+                "db_detected": db_detected,
+                "db_failed": db_failed
+            }
+        )
+
+    def resume(self):
+        self._write_paused_to_db(False)
+        with self.lock:
+            self.pause_requested = False
+            if self.detecting:
+                return
+        self.trigger_batch_detection(rerun=False)
+
+    def get_detection_status(self) -> dict:
+        db_total, db_detected, db_failed = self._get_db_stats()
+        paused = self._read_paused_from_db()
+        with self.lock:
+            return {
+                "running": self.detecting,
+                "is_running": self.detecting,
+                "paused": paused,
+                "detected": self.detected,
+                "processed_files": self.detected,
+                "total": self.total,
+                "total_files": self.total,
+                "status": self.current_status,
+                "current_file": self.current_file,
+                "db_total": db_total,
+                "db_detected": db_detected,
+                "db_failed": db_failed
+            }
+
+    def _get_db_stats(self) -> tuple:
+        try:
+            with get_db() as conn:
+                total = conn.execute("SELECT COUNT(*) as count FROM images WHERE trashed = 0").fetchone()["count"]
+                detected = conn.execute("SELECT COUNT(*) as count FROM images WHERE face_analysed = 1 AND trashed = 0").fetchone()["count"]
+                failed = conn.execute("SELECT COUNT(*) as count FROM images WHERE face_failed = 1 AND trashed = 0").fetchone()["count"]
+                return total, detected, failed
+        except Exception as e:
+            logger.warning(f"Failed to query database stats: {e}")
+            return 0, 0, 0
+
+    def trigger_batch_detection(self, rerun: bool):
+        with self.lock:
+            if self.detecting:
+                return
+            self.detecting = True
+            self.pause_requested = False
+            self.current_status = "running"
+
+        t = threading.Thread(target=self._do_batch_detection, args=(rerun,), daemon=True)
+        t.start()
+
+    def _do_batch_detection(self, rerun: bool):
+        try:
+            with get_db() as conn:
+                if rerun:
+                    cursor = conn.execute("SELECT * FROM images WHERE trashed = 0")
+                else:
+                    cursor = conn.execute("SELECT * FROM images WHERE (face_analysed = 0 OR face_analysed IS NULL) AND trashed = 0")
+                images = cursor.fetchall()
+
+            logger.info(f"Batch face detection: Found {len(images)} images to process (rerun={rerun})")
+
+            with self.lock:
+                self.total = len(images)
+                self.detected = 0
+
+            db_total, db_detected, db_failed = self._get_db_stats()
+            notification_service.broadcast(
+                "face:started",
+                {
+                    "message": "Face detection started",
+                    "total": len(images),
+                    "rerun": rerun,
+                    "db_total": db_total,
+                    "db_detected": db_detected,
+                    "db_failed": db_failed
+                }
+            )
+
+            last_progress_broadcast = 0.0
+
+            for img in images:
+                with self.lock:
+                    should_pause = self.pause_requested
+
+                if should_pause:
+                    logger.info("Face detection batch paused by user request")
+                    with self.lock:
+                        self.current_status = "paused"
+                    db_total, db_detected, db_failed = self._get_db_stats()
+                    notification_service.broadcast(
+                        "face:paused",
+                        {
+                            "message": "Face detection paused",
+                            "detected": self.detected,
+                            "total": self.total,
+                            "db_total": db_total,
+                            "db_detected": db_detected,
+                            "db_failed": db_failed
+                        }
+                    )
+                    return
+
+                file_path = img["file_path"]
+                filename = os.path.basename(file_path)
+
+                with self.lock:
+                    self.current_file = filename
+
+                try:
+                    logger.info(f"Running face detection on [{self.detected + 1}/{self.total}]: {file_path}")
+                    self.detect_faces_in_image(img["id"], file_path)
+                except Exception as e:
+                    logger.warning(f"Failed to detect faces in image {file_path}: {e}")
+                    try:
+                        with get_db() as conn:
+                            conn.execute("UPDATE images SET face_failed = 1, face_error = ? WHERE id = ?", (str(e), img["id"]))
+                    except Exception as db_err:
+                        logger.warning(f"Failed to update image error in DB: {db_err}")
+
+                    db_total, db_detected, db_failed = self._get_db_stats()
+                    notification_service.broadcast(
+                        "face:error",
+                        {
+                            "message": f"Failed: {filename}",
+                            "detail": str(e),
+                            "db_total": db_total,
+                            "db_detected": db_detected,
+                            "db_failed": db_failed
+                        }
+                    )
+
+                with self.lock:
+                    self.detected += 1
+                    done = self.detected
+
+                now = time.time()
+                if now - last_progress_broadcast >= 1.0:
+                    last_progress_broadcast = now
+                    db_total, db_detected, db_failed = self._get_db_stats()
+                    notification_service.broadcast(
+                        "face:progress",
+                        {
+                            "detected": done,
+                            "total": self.total,
+                            "current_file": filename,
+                            "db_total": db_total,
+                            "db_detected": db_detected,
+                            "db_failed": db_failed
+                        }
+                    )
+
+            with self.lock:
+                self.current_status = "completed"
+                done = self.detected
+
+            self._write_paused_to_db(False)
+
+            db_total, db_detected, db_failed = self._get_db_stats()
+            notification_service.broadcast(
+                "face:completed",
+                {
+                    "message": "Face detection complete",
+                    "detected": done,
+                    "total": self.total,
+                    "db_total": db_total,
+                    "db_detected": db_detected
+                }
+            )
+        except Exception as e:
+            with self.lock:
+                self.current_status = "error"
+            logger.exception("Batch face detection failed")
+            notification_service.broadcast(
+                "face:error",
+                {
+                    "message": "Batch face detection failed",
+                    "detail": str(e)
+                }
+            )
+        finally:
+            with self.lock:
+                self.detecting = False
+                self.current_file = ""
+
+    def detect_faces_in_image(self, img_id: str, file_path: str):
+        if not os.path.exists(file_path):
+            return
+
+        import face_recognition
+        from PIL import Image
+
+        # 1. Clear existing faces for this image
+        FACES_DIR = os.path.join(DB_DIR, "faces")
+        os.makedirs(FACES_DIR, exist_ok=True)
+
+        with get_db() as conn:
+            cursor = conn.execute("SELECT thumbnail_path FROM faces WHERE image_id = ?", (img_id,))
+            old_faces = cursor.fetchall()
+            for f in old_faces:
+                if f["thumbnail_path"] and os.path.exists(f["thumbnail_path"]):
+                    try:
+                        os.remove(f["thumbnail_path"])
+                    except Exception:
+                        pass
+            conn.execute("DELETE FROM faces WHERE image_id = ?", (img_id,))
+
+        # 2. Run face-recognition
+        logger.info(f"Loading image and running face_recognition on: {file_path}")
+        image = face_recognition.load_image_file(file_path)
+        face_locations = face_recognition.face_locations(image)
+        logger.info(f"Detected {len(face_locations)} faces in {file_path}")
+
+        # 3. Save faces to DB and crop thumbnails
+        pil_img = Image.open(file_path)
+        img_w, img_h = pil_img.size
+
+        with get_db() as conn:
+            for face_location in face_locations:
+                top, right, bottom, left = face_location
+
+                # Crop with a 20% margin
+                height = bottom - top
+                width = right - left
+                margin_h = int(height * 0.2)
+                margin_w = int(width * 0.2)
+
+                crop_left = max(0, left - margin_w)
+                crop_top = max(0, top - margin_h)
+                crop_right = min(img_w, right + margin_w)
+                crop_bottom = min(img_h, bottom + margin_h)
+
+                face_crop = pil_img.crop((crop_left, crop_top, crop_right, crop_bottom))
+                face_crop.thumbnail((150, 150))
+
+                face_id = "face_" + uuid.uuid4().hex
+                face_thumb_name = f"{face_id}.jpg"
+                face_thumb_path = os.path.join(FACES_DIR, face_thumb_name)
+                face_crop.convert("RGB").save(face_thumb_path, "JPEG")
+
+                conn.execute(
+                    """INSERT INTO faces (id, image_id, name, box_top, box_right, box_bottom, box_left, thumbnail_path)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (face_id, img_id, None, top, right, bottom, left, face_thumb_path)
+                )
+
+            # Mark image as face analysed
+            conn.execute(
+                "UPDATE images SET face_analysed = 1, face_failed = 0, face_error = NULL WHERE id = ?",
+                (img_id,)
+            )
+
+        log_event("face:detected", file_path=file_path, details=f"Detected {len(face_locations)} faces in image")
+
 
 ai_service = AiService()
+face_service = FaceDetectionService()
 
 
 # -------------------------------------------------------------------------

@@ -26,8 +26,10 @@ import {
     Aperture,
     MapPin,
     AlertCircle,
+    ScanFace,
 } from 'lucide-react';
 import { Map, Marker } from 'pigeon-maps';
+import { Checkbox } from '@/components/ui/checkbox';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 import { formatFileSize } from '@/lib/utils';
@@ -102,6 +104,8 @@ const ImageDetailModal = ({
     hasPrevious,
 }) => {
     const { aiStatus } = useAIStatus();
+    const [markFaces, setMarkFaces] = useState(false);
+    const [imageRect, setImageRect] = useState({ left: 0, top: 0, width: 0, height: 0 });
     const [description, setDescription] = useState('');
     const [newTag, setNewTag] = useState('');
     const [tags, setTags] = useState([]);
@@ -169,6 +173,43 @@ const ImageDetailModal = ({
                 .catch(() => {});
         }
     }, [image?.id, image?.full_path, isOpen]);
+
+    const updateImageRect = () => {
+        if (!imgRef.current || !imgLoaded) return;
+        const img = imgRef.current;
+        const { clientWidth, clientHeight } = img;
+        const naturalWidth = img.naturalWidth;
+        const naturalHeight = img.naturalHeight;
+        if (!naturalWidth || !naturalHeight) return;
+
+        const imageRatio = naturalWidth / naturalHeight;
+        const elementRatio = clientWidth / clientHeight;
+
+        let width, height, left, top;
+        if (elementRatio > imageRatio) {
+            height = clientHeight;
+            width = clientHeight * imageRatio;
+            left = (clientWidth - width) / 2;
+            top = 0;
+        } else {
+            width = clientWidth;
+            height = clientWidth / imageRatio;
+            left = 0;
+            top = (clientHeight - height) / 2;
+        }
+        setImageRect({
+            left: img.offsetLeft + left,
+            top: img.offsetTop + top,
+            width,
+            height,
+        });
+    };
+
+    useEffect(() => {
+        updateImageRect();
+        window.addEventListener('resize', updateImageRect);
+        return () => window.removeEventListener('resize', updateImageRect);
+    }, [imgLoaded, image?.full_path]);
 
     const fetchAllAlbums = async () => {
         try {
@@ -713,22 +754,79 @@ const ImageDetailModal = ({
                         </div>
                     )}
 
-                    <img
-                        ref={imgRef}
-                        key={image.full_path}
-                        src={api.images.getRawUrl(image.full_path)}
-                        alt={fileName}
-                        onLoad={() => setImgLoaded(true)}
-                        className="max-w-full max-h-full object-contain will-change-transform"
+                    <div
                         style={{
                             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                             transition: isDragging ? 'none' : 'transform 0.1s ease',
-                            userSelect: 'none',
-                            pointerEvents: 'none',
-                            opacity: imgLoaded ? 1 : 0,
+                            position: 'relative',
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                         }}
-                        draggable={false}
-                    />
+                    >
+                        <img
+                            ref={imgRef}
+                            key={image.full_path}
+                            src={api.images.getRawUrl(image.full_path)}
+                            alt={fileName}
+                            onLoad={() => {
+                                setImgLoaded(true);
+                            }}
+                            className="max-w-full max-h-full object-contain"
+                            style={{
+                                userSelect: 'none',
+                                pointerEvents: 'none',
+                                opacity: imgLoaded ? 1 : 0,
+                            }}
+                            draggable={false}
+                        />
+
+                        {imgLoaded && markFaces && (image?.faces || details?.faces) && (
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    left: `${imageRect.left}px`,
+                                    top: `${imageRect.top}px`,
+                                    width: `${imageRect.width}px`,
+                                    height: `${imageRect.height}px`,
+                                    pointerEvents: 'none',
+                                }}
+                            >
+                                {(image.faces || details.faces || []).map((face) => {
+                                    const W = imgRef.current?.naturalWidth || image.width || 1;
+                                    const H = imgRef.current?.naturalHeight || image.height || 1;
+
+                                    const top_pct = (face.box_top / H) * 100;
+                                    const left_pct = (face.box_left / W) * 100;
+                                    const width_pct = ((face.box_right - face.box_left) / W) * 100;
+                                    const height_pct = ((face.box_bottom - face.box_top) / H) * 100;
+
+                                    return (
+                                        <div
+                                            key={face.id}
+                                            style={{
+                                                position: 'absolute',
+                                                top: `${top_pct}%`,
+                                                left: `${left_pct}%`,
+                                                width: `${width_pct}%`,
+                                                height: `${height_pct}%`,
+                                                border: '2px solid #6366f1',
+                                                borderRadius: '4px',
+                                                backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                                            }}
+                                            className="group/face transition-all duration-200"
+                                        >
+                                            <div className="absolute -top-6 left-0 bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded shadow-md whitespace-nowrap opacity-100 font-medium">
+                                                {face.name || 'Unnamed'}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Prev arrow */}
                     {hasPrevious && (
@@ -805,6 +903,25 @@ const ImageDetailModal = ({
                         </div>
                         {/* Scrollable content body */}
                         <section className="relative flex-1 overflow-y-auto min-h-0">
+                            {/* Mark Faces Checkbox (Only if image has faces) */}
+                            {((image?.faces && image.faces.length > 0) ||
+                                (details?.faces && details.faces.length > 0)) && (
+                                <div className="mt-6 px-4 flex items-center gap-2">
+                                    <Checkbox
+                                        id="mark-faces-checkbox"
+                                        checked={markFaces}
+                                        onCheckedChange={(checked) => setMarkFaces(!!checked)}
+                                    />
+                                    <label
+                                        htmlFor="mark-faces-checkbox"
+                                        className="text-sm font-medium text-gray-200 cursor-pointer select-none flex items-center gap-1.5"
+                                    >
+                                        <ScanFace className="w-4 h-4 text-indigo-500" />
+                                        Mark Faces
+                                    </label>
+                                </div>
+                            )}
+
                             {/* Description Section */}
                             <div className="mt-6 px-4">
                                 <SectionHeader>Description</SectionHeader>

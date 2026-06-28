@@ -23,6 +23,7 @@ import {
     Loader2,
     AlertCircle,
     Aperture,
+    ScanFace,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -32,7 +33,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { unreadCount, aiStatus, folderScans } = useNotifications();
+    const { unreadCount, aiStatus, faceStatus, folderScans } = useNotifications();
     const [isCollapsed, setIsCollapsed] = useState(() => {
         const saved = localStorage.getItem('sidebar-collapsed');
         return saved === 'true';
@@ -86,7 +87,10 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
     }, []);
 
     // Main Section items
-    const mainNavItems = [{ id: 'timeline', label: 'Photos', icon: Calendar, path: '/timeline' }];
+    const mainNavItems = [
+        { id: 'timeline', label: 'Photos', icon: Calendar, path: '/timeline' },
+        { id: 'people', label: 'People', icon: ScanFace, path: '/people' },
+    ];
 
     // Library Section items (matches modern)
     const libraryNavItems = [
@@ -151,9 +155,15 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                                         : 'text-slate-600 dark:text-white/60 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/[0.06]'
                                 }`}
                             >
-                                <Aperture
-                                    className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
-                                />
+                                {item.id === 'timeline' ? (
+                                    <Aperture
+                                        className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
+                                    />
+                                ) : (
+                                    <Icon
+                                        className={`w-[18px] h-[18px] shrink-0 ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-white/50'}`}
+                                    />
+                                )}
                                 {!isCollapsed && <span className="truncate">{item.label}</span>}
                             </button>
                         );
@@ -510,6 +520,150 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                                     {isPaused && (
                                         <p className="text-amber-400 font-medium">
                                             ⏸ Analysis is paused. Click ▶ to resume.
+                                        </p>
+                                    )}
+                                </TooltipContent>
+                            </Tooltip>
+                        );
+                    })()}
+
+                {/* Face Detection Widget Card */}
+                {!isCollapsed &&
+                    (() => {
+                        const total = faceStatus?.db_total || 0;
+                        const detected = faceStatus?.db_detected || 0;
+                        const percent = total > 0 ? Math.round((detected / total) * 100) : 0;
+                        const isRunning = faceStatus?.is_running || false;
+                        const isPaused = faceStatus?.paused || false;
+                        const pending = total - detected;
+
+                        const handlePlayPause = async () => {
+                            try {
+                                if (isRunning) {
+                                    await api.face.pauseDetection();
+                                } else {
+                                    await api.face.batchDetect();
+                                }
+                            } catch (e) {
+                                console.error('Face detection control failed:', e);
+                            }
+                        };
+
+                        let statusLabel;
+                        let statusColor;
+                        if (isRunning) {
+                            statusLabel = 'Detecting...';
+                            statusColor = 'text-indigo-500 dark:text-indigo-400';
+                        } else if (isPaused) {
+                            statusLabel = 'Paused';
+                            statusColor = 'text-amber-500 dark:text-amber-400';
+                        } else if (pending === 0 && total > 0) {
+                            statusLabel = 'Complete';
+                            statusColor = 'text-emerald-500 dark:text-emerald-400';
+                        } else {
+                            statusLabel = `${pending} pending`;
+                            statusColor = 'text-slate-400 dark:text-white/40';
+                        }
+
+                        const isFaceActive = location.pathname === '/people';
+
+                        return (
+                            <Tooltip delayDuration={300}>
+                                <TooltipTrigger asChild>
+                                    <div
+                                        onClick={() => {
+                                            navigate('/people');
+                                            if (onItemClick) onItemClick();
+                                        }}
+                                        className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
+                                            isFaceActive
+                                                ? 'bg-indigo-500/10 border-indigo-500/30 dark:bg-indigo-500/15 dark:border-indigo-500/40'
+                                                : 'bg-slate-200/30 dark:bg-white/[0.04] border-slate-200/80 dark:border-white/[0.06] hover:bg-slate-200/50 dark:hover:bg-white/[0.08]'
+                                        }`}
+                                    >
+                                        <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">
+                                            <span className="flex items-center gap-1.5 select-none text-slate-600 dark:text-white/80">
+                                                <ScanFace className="w-3.5 h-3.5 text-indigo-500" />
+                                                Face Detection
+                                            </span>
+                                            <span className="tabular-nums font-medium text-slate-500 dark:text-white/60">
+                                                {detected} of {total}
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-slate-200 dark:bg-white/10 h-1 rounded-full overflow-hidden mb-2">
+                                            <div
+                                                className="bg-indigo-500 h-full rounded-full transition-all duration-500 ease-out"
+                                                style={{ width: `${percent}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px]">
+                                            <span className={`font-medium ${statusColor}`}>
+                                                {isRunning && (
+                                                    <Loader2 className="inline w-2.5 h-2.5 mr-1 animate-spin" />
+                                                )}
+                                                {statusLabel}
+                                            </span>
+                                            <div className="flex items-center gap-1.5">
+                                                {/* Red warning button for failed files */}
+                                                {faceStatus?.db_failed > 0 && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate('/timeline?face_failed=true');
+                                                            if (onItemClick) onItemClick();
+                                                        }}
+                                                        title={`${faceStatus.db_failed} face detection failed files. Click to view.`}
+                                                        className="flex items-center justify-center w-5 h-5 rounded-full bg-red-500/15 text-red-500 hover:bg-red-500/25 animate-pulse"
+                                                    >
+                                                        <AlertCircle className="w-2.5 h-2.5" />
+                                                    </button>
+                                                )}
+                                                {/* Play / Pause button */}
+                                                {total > 0 && !isCollapsed && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handlePlayPause();
+                                                        }}
+                                                        title={
+                                                            isRunning
+                                                                ? 'Pause face detection'
+                                                                : 'Start / Resume face detection'
+                                                        }
+                                                        className={`flex items-center justify-center w-5 h-5 rounded-full transition-all ${
+                                                            isRunning
+                                                                ? 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
+                                                                : 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
+                                                        }`}
+                                                    >
+                                                        {isRunning ? (
+                                                            <Pause className="w-2.5 h-2.5" />
+                                                        ) : (
+                                                            <Play className="w-2.5 h-2.5" />
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                    side="right"
+                                    align="center"
+                                    className="max-w-xs text-xs bg-zinc-900 border-zinc-800 text-white shadow-xl p-3 space-y-1"
+                                >
+                                    <p className="font-semibold text-indigo-400">Face Detection</p>
+                                    <p className="text-zinc-300 leading-relaxed">
+                                        {detected} of {total} images processed ({percent}%)
+                                        {faceStatus?.db_failed > 0
+                                            ? `, ${faceStatus.db_failed} failed`
+                                            : ''}
+                                        . Processes images in the background to detect faces and
+                                        build the People library.
+                                    </p>
+                                    {isPaused && (
+                                        <p className="text-amber-400 font-medium">
+                                            ⏸ Detection is paused. Click ▶ to resume.
                                         </p>
                                     )}
                                 </TooltipContent>

@@ -38,6 +38,14 @@ class AlbumInfo(BaseModel):
     id: str
     name: str
 
+class FaceInfo(BaseModel):
+    id: str
+    name: Optional[str] = None
+    box_top: int
+    box_right: int
+    box_bottom: int
+    box_left: int
+
 class ImageRecordResponse(BaseModel):
     id: str
     file_path: str
@@ -53,6 +61,10 @@ class ImageRecordResponse(BaseModel):
     ai_analysed: bool
     ai_failed: bool = False
     ai_error: Optional[str] = None
+    face_analysed: bool = False
+    face_failed: bool = False
+    face_error: Optional[str] = None
+    faces: List[FaceInfo] = []
     thumbnail_path: Optional[str] = None
     favorite: bool
     trashed: bool

@@ -183,7 +183,11 @@ class ApiClient {
             trashed = false,
             albumId = null,
             aiAnalysed = null,
-            aiFailed = null
+            aiFailed = null,
+            faceAnalysed = null,
+            faceFailed = null,
+            person = null,
+            faceId = null
         ) => {
             const params = new URLSearchParams({
                 page,
@@ -205,6 +209,10 @@ class ApiClient {
             if (trashed != null) params.append('trashed', trashed);
             if (aiAnalysed != null) params.append('ai_analysed', aiAnalysed);
             if (aiFailed != null) params.append('ai_failed', aiFailed);
+            if (faceAnalysed != null) params.append('face_analysed', faceAnalysed);
+            if (faceFailed != null) params.append('face_failed', faceFailed);
+            if (person != null) params.append('person', person);
+            if (faceId != null) params.append('face_id', faceId);
             return this.request(`/images?${params.toString()}`);
         },
         getMetadata: (path = null, id = null, filters = {}) => {
@@ -343,6 +351,30 @@ class ApiClient {
         pauseAnalysis: () => this.request('/ai/pause', { method: 'POST' }),
         resumeAnalysis: () => this.request('/ai/resume', { method: 'POST' }),
         getAnalysisStatus: () => this.request('/ai/analysis-status'),
+    };
+
+    // Face Detection & People API
+    face = {
+        getDetectionStatus: () => this.request('/face/detection-status'),
+        batchDetect: (rerun = false) =>
+            this.request('/face/batch-detect', {
+                method: 'POST',
+                body: JSON.stringify({ rerun }),
+            }),
+        pauseDetection: () => this.request('/face/pause', { method: 'POST' }),
+        resumeDetection: () => this.request('/face/resume', { method: 'POST' }),
+        detect: (imagePath) =>
+            this.request('/face/detect', {
+                method: 'POST',
+                body: JSON.stringify({ image_path: imagePath }),
+            }),
+        listFaces: () => this.request('/faces'),
+        updateFaceName: (faceId, name) =>
+            this.request(`/faces/${faceId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ name }),
+            }),
+        getFaceThumbnailUrl: (faceId) => `${this.baseURL}/faces/${faceId}/thumbnail`,
     };
 }
 
