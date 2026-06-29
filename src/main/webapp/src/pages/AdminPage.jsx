@@ -27,33 +27,81 @@ const AdminPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const activeTab = location.pathname.startsWith('/gallery')
-        ? 'gallery'
-        : location.pathname.startsWith('/favorites')
-          ? 'favorites'
-          : location.pathname.startsWith('/albums')
-            ? 'albums'
-            : location.pathname.startsWith('/trash')
-              ? 'trash'
-              : location.pathname.startsWith('/places')
-                ? 'places'
-                : location.pathname.startsWith('/people')
-                  ? 'people'
-                  : location.pathname.startsWith('/settings')
-                    ? 'settings'
-                    : location.pathname.startsWith('/notifications')
-                      ? 'notifications'
-                      : location.pathname.startsWith('/photos')
-                        ? location.state?.background?.startsWith('/gallery')
-                            ? 'gallery'
-                            : location.state?.background?.startsWith('/favorites')
-                              ? 'favorites'
-                              : location.state?.background?.startsWith('/albums')
-                                ? 'albums'
-                                : location.state?.background?.startsWith('/trash')
-                                  ? 'trash'
-                                  : 'timeline'
-                        : 'timeline';
+    // activeTab determines which view component is rendered in the main panel
+    const getActiveTab = () => {
+        const pathname = location.pathname;
+
+        if (pathname.startsWith('/gallery')) return 'gallery';
+        if (pathname.startsWith('/favorites')) return 'favorites';
+        if (pathname.startsWith('/albums')) return 'albums';
+        if (pathname.startsWith('/trash')) return 'trash';
+        if (pathname.startsWith('/places')) return 'places';
+        if (pathname.startsWith('/people')) return 'people';
+        if (pathname.startsWith('/settings')) return 'settings';
+        if (pathname.startsWith('/notifications')) return 'notifications';
+
+        if (pathname.startsWith('/photos')) {
+            const bg = location.state?.background || '';
+            if (bg.startsWith('/gallery')) return 'gallery';
+            if (bg.startsWith('/favorites')) return 'favorites';
+            if (bg.startsWith('/albums')) return 'albums';
+            if (bg.startsWith('/trash')) return 'trash';
+            return 'timeline';
+        }
+
+        return 'timeline';
+    };
+
+    const activeTab = getActiveTab();
+
+    // sidebarActiveTab determines which tab is highlighted in the sidebar
+    const getSidebarActiveTab = () => {
+        const pathname = location.pathname;
+        const search = location.search;
+
+        if (pathname.startsWith('/gallery')) return 'gallery';
+        if (pathname.startsWith('/favorites')) return 'favorites';
+        if (pathname.startsWith('/albums')) return 'albums';
+        if (pathname.startsWith('/trash')) return 'trash';
+        if (pathname.startsWith('/places')) return 'places';
+        if (pathname.startsWith('/people')) return 'people';
+        if (pathname.startsWith('/settings')) return 'settings';
+        if (pathname.startsWith('/notifications')) return 'notifications';
+
+        if (pathname.startsWith('/timeline')) {
+            const params = new URLSearchParams(search);
+            if (params.has('person') || params.has('face_id')) {
+                return 'people';
+            }
+            return 'timeline';
+        }
+
+        if (pathname.startsWith('/photos')) {
+            const bg = location.state?.background || '';
+            if (bg.startsWith('/gallery')) return 'gallery';
+            if (bg.startsWith('/favorites')) return 'favorites';
+            if (bg.startsWith('/albums')) return 'albums';
+            if (bg.startsWith('/trash')) return 'trash';
+
+            // Check if background is a person's timeline
+            try {
+                const bgUrl = new URL(bg, window.location.origin);
+                if (bgUrl.pathname.startsWith('/timeline')) {
+                    const bgParams = bgUrl.searchParams;
+                    if (bgParams.has('person') || bgParams.has('face_id')) {
+                        return 'people';
+                    }
+                }
+            } catch (e) {
+                // Fallback if URL parsing fails
+            }
+            return 'timeline';
+        }
+
+        return 'timeline';
+    };
+
+    const sidebarActiveTab = getSidebarActiveTab();
 
     const { toast } = useToast();
 
@@ -113,7 +161,7 @@ const AdminPage = () => {
 
             {/* Desktop Sidebar */}
             <div className="hidden md:flex">
-                <Sidebar username={username} onLogout={handleLogout} activeTab={activeTab} />
+                <Sidebar username={username} onLogout={handleLogout} activeTab={sidebarActiveTab} />
             </div>
 
             {/* Mobile Drawer Sidebar */}
@@ -137,7 +185,7 @@ const AdminPage = () => {
                             <Sidebar
                                 username={username}
                                 onLogout={handleLogout}
-                                activeTab={activeTab}
+                                activeTab={sidebarActiveTab}
                                 onItemClick={() => setIsMobileOpen(false)}
                             />
                         </motion.div>
@@ -149,7 +197,7 @@ const AdminPage = () => {
             <div className="flex flex-col flex-1 h-screen overflow-hidden">
                 <Header
                     onMenuClick={() => setIsMobileOpen(true)}
-                    title={activeTab}
+                    title={sidebarActiveTab}
                     username={username}
                     onLogout={handleLogout}
                 />

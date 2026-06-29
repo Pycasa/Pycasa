@@ -1131,6 +1131,9 @@ class FaceDetectionService:
         import face_recognition
         from PIL import Image
 
+        from PIL import Image, ImageOps
+        import numpy as np
+
         # 1. Clear existing faces for this image
         FACES_DIR = os.path.join(DB_DIR, "faces")
         os.makedirs(FACES_DIR, exist_ok=True)
@@ -1146,16 +1149,18 @@ class FaceDetectionService:
                         pass
             conn.execute("DELETE FROM faces WHERE image_id = ?", (img_id,))
 
-        # 2. Run face-recognition
-        logger.info(f"Loading image and running face_recognition on: {file_path}")
-        image = face_recognition.load_image_file(file_path)
-        face_locations = face_recognition.face_locations(image)
+        # 2. Run face-recognition on the transposed (upright) image
+        logger.info(f"Loading and transposing image for face_recognition: {file_path}")
+        pil_img = Image.open(file_path)
+        pil_img = ImageOps.exif_transpose(pil_img)
+        img_w, img_h = pil_img.size
+
+        # Convert to RGB numpy array for face_recognition
+        image_np = np.array(pil_img.convert("RGB"))
+        face_locations = face_recognition.face_locations(image_np)
         logger.info(f"Detected {len(face_locations)} faces in {file_path}")
 
         # 3. Save faces to DB and crop thumbnails
-        pil_img = Image.open(file_path)
-        img_w, img_h = pil_img.size
-
         with get_db() as conn:
             for face_location in face_locations:
                 top, right, bottom, left = face_location

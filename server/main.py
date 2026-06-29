@@ -1413,6 +1413,7 @@ def list_faces():
                JOIN images i ON f.image_id = i.id
                ORDER BY CASE WHEN f.name IS NULL OR f.name = '' THEN 1 ELSE 0 END ASC,
                         f.name ASC,
+                        f.is_cover DESC,
                         f.id DESC"""
         )
         return [dict(row) for row in cursor.fetchall()]
@@ -1431,6 +1432,23 @@ def update_face_name(face_id: str, body: dict):
         else:
             conn.execute("UPDATE faces SET name = ? WHERE id = ?", (name, face_id))
     return {"message": "Face name updated successfully"}
+
+@app.put("/api/faces/{face_id}/cover")
+def set_face_as_cover(face_id: str):
+    with get_db() as conn:
+        row = conn.execute("SELECT name FROM faces WHERE id = ?", (face_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Face not found")
+
+        name = row["name"]
+        if not name or not name.strip():
+            raise HTTPException(status_code=400, detail="Cannot set cover for unnamed face")
+
+        # Reset is_cover for all other faces of this person
+        conn.execute("UPDATE faces SET is_cover = 0 WHERE name = ?", (name,))
+        # Set is_cover = 1 for this face
+        conn.execute("UPDATE faces SET is_cover = 1 WHERE id = ?", (face_id,))
+    return {"message": "Face set as cover successfully"}
 
 @app.get("/api/faces/{face_id}/thumbnail")
 def get_face_thumbnail(face_id: str):

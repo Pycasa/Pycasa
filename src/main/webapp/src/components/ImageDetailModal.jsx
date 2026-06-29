@@ -206,9 +206,13 @@ const ImageDetailModal = ({
     };
 
     useEffect(() => {
+        if (!imgRef.current) return;
         updateImageRect();
-        window.addEventListener('resize', updateImageRect);
-        return () => window.removeEventListener('resize', updateImageRect);
+        const observer = new ResizeObserver(() => {
+            updateImageRect();
+        });
+        observer.observe(imgRef.current);
+        return () => observer.disconnect();
     }, [imgLoaded, image?.full_path]);
 
     const fetchAllAlbums = async () => {

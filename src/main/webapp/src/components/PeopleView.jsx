@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
-import { ScanFace, Search, Loader2, Edit2, ArrowRight } from 'lucide-react';
+import { ScanFace, Search, Loader2, Edit2, ArrowRight, Camera } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import {
@@ -28,6 +28,12 @@ const PeopleView = () => {
     const [pendingMergeFace, setPendingMergeFace] = useState(null);
     const [pendingMergeName, setPendingMergeName] = useState('');
     const [pendingMergeTargetFace, setPendingMergeTargetFace] = useState(null);
+
+    // Representative cover photo state
+    const [coverDialogOpen, setCoverDialogOpen] = useState(false);
+    const [coverDialogFace, setCoverDialogFace] = useState(null);
+    const [selectedCoverFaceId, setSelectedCoverFaceId] = useState(null);
+    const [savingCover, setSavingCover] = useState(false);
 
     const fetchFaces = async () => {
         try {
@@ -87,6 +93,26 @@ const PeopleView = () => {
         setPendingMergeFace(null);
         setPendingMergeName('');
         setPendingMergeTargetFace(null);
+    };
+
+    const handleOpenCoverDialog = (face) => {
+        setCoverDialogFace(face);
+        setSelectedCoverFaceId(face.id);
+        setCoverDialogOpen(true);
+    };
+
+    const handleSaveCover = async () => {
+        if (!selectedCoverFaceId || !coverDialogFace) return;
+        setSavingCover(true);
+        try {
+            await api.face.setFaceCover(selectedCoverFaceId);
+            await fetchFaces();
+            setCoverDialogOpen(false);
+        } catch (err) {
+            console.error('Failed to set cover face:', err);
+        } finally {
+            setSavingCover(false);
+        }
     };
 
     const handleCancelMerge = () => {
@@ -230,6 +256,19 @@ const PeopleView = () => {
                                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                             loading="lazy"
                                         />
+                                        {/* Change cover photo button */}
+                                        {face.name && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenCoverDialog(face);
+                                                }}
+                                                className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/85 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg border border-white/10 z-10"
+                                                title="Choose representative photo"
+                                            >
+                                                <Camera className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* Inline name editing area */}
@@ -357,6 +396,69 @@ const PeopleView = () => {
                             className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
                         >
                             Yes, Merge
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Choose Representative Photo Dialog */}
+            <Dialog open={coverDialogOpen} onOpenChange={setCoverDialogOpen}>
+                <DialogContent className="sm:max-w-[425px] bg-white dark:bg-[#09090b] border-slate-200 dark:border-zinc-800">
+                    <DialogHeader>
+                        <DialogTitle className="text-slate-950 dark:text-white">
+                            Choose Representative Photo
+                        </DialogTitle>
+                        <DialogDescription className="text-slate-500 dark:text-zinc-400">
+                            Select a photo to represent {coverDialogFace?.name} in the People view.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-4">
+                        {coverDialogFace && (
+                            <div className="grid grid-cols-4 gap-3 max-h-[280px] overflow-y-auto p-2 bg-slate-50 dark:bg-zinc-900/50 rounded-lg border border-slate-100 dark:border-white/[0.03]">
+                                {faces
+                                    .filter(
+                                        (f) =>
+                                            f.name &&
+                                            f.name.toLowerCase() ===
+                                                coverDialogFace.name.toLowerCase()
+                                    )
+                                    .map((f) => (
+                                        <div
+                                            key={f.id}
+                                            onClick={() => setSelectedCoverFaceId(f.id)}
+                                            className={`aspect-square rounded-full overflow-hidden border-2 cursor-pointer transition-all relative group/thumb ${
+                                                selectedCoverFaceId === f.id
+                                                    ? 'border-indigo-600 ring-2 ring-indigo-500/30 scale-95 shadow-md'
+                                                    : 'border-transparent hover:border-slate-300 dark:hover:border-zinc-700 hover:scale-105'
+                                            }`}
+                                        >
+                                            <img
+                                                src={api.face.getFaceThumbnailUrl(f.id)}
+                                                alt="Face Option"
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                            />
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter className="gap-2 border-t border-slate-100 dark:border-white/[0.05] pt-3">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setCoverDialogOpen(false)}
+                            className="text-xs h-9"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSaveCover}
+                            disabled={savingCover}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-9"
+                        >
+                            {savingCover ? 'Saving...' : 'Save'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

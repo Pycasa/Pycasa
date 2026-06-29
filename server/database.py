@@ -175,6 +175,14 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_faces_image_id ON faces (image_id);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_faces_name ON faces (name);")
 
+        # Migration: Add is_cover to faces
+        try:
+            conn.execute("ALTER TABLE faces ADD COLUMN is_cover INTEGER DEFAULT 0;")
+            logger.info("Migrated faces table: added is_cover column")
+        except sqlite3.OperationalError:
+            # Column already exists
+            pass
+
         # Create Events table
         conn.execute("""
         CREATE TABLE IF NOT EXISTS events (

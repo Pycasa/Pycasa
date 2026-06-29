@@ -375,6 +375,10 @@ class ApiClient {
                 body: JSON.stringify({ name }),
             }),
         getFaceThumbnailUrl: (faceId) => `${this.baseURL}/faces/${faceId}/thumbnail`,
+        setFaceCover: (faceId) =>
+            this.request(`/faces/${faceId}/cover`, {
+                method: 'PUT',
+            }),
     };
 }
 

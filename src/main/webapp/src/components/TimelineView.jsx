@@ -497,12 +497,14 @@ const TimelineView = () => {
     const setSelectedImage = useCallback(
         (img) => {
             if (!img) {
-                navigate('/timeline');
+                const backUrl = location.state?.background || '/timeline';
+                navigate(backUrl);
                 return;
             }
-            navigate(`/photos/${img.id}`, { state: { background: '/timeline' } });
+            const bg = location.state?.background || location.pathname + location.search;
+            navigate(`/photos/${img.id}`, { state: { background: bg } });
         },
-        [navigate]
+        [navigate, location]
     );
 
     // ── Data fetching ────────────────────────────────────────────────────────
@@ -1171,7 +1173,10 @@ const TimelineView = () => {
                 <ImageDetailModal
                     image={modalImage}
                     isOpen={!!id}
-                    onClose={() => navigate('/timeline')}
+                    onClose={() => {
+                        const bg = location.state?.background || '/timeline';
+                        navigate(bg);
+                    }}
                     onUpdate={() => {
                         if (selectedImageIndex !== null) {
                             const pageNum = Math.floor(selectedImageIndex / 50) + 1;
