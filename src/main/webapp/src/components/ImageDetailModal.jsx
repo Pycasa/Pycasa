@@ -207,11 +207,26 @@ const ImageDetailModal = ({
 
     useEffect(() => {
         if (!imgRef.current) return;
-        updateImageRect();
-        const observer = new ResizeObserver(() => {
-            updateImageRect();
-        });
+
+        const handleResize = () => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    updateImageRect();
+                });
+            });
+        };
+
+        // Initial calculation
+        handleResize();
+
+        const observer = new ResizeObserver(handleResize);
         observer.observe(imgRef.current);
+
+        const parent = imgRef.current.parentElement;
+        if (parent) {
+            observer.observe(parent);
+        }
+
         return () => observer.disconnect();
     }, [imgLoaded, image?.full_path]);
 
