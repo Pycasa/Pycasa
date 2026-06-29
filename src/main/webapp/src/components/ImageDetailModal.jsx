@@ -27,7 +27,9 @@ import {
     MapPin,
     AlertCircle,
     ScanFace,
+    Edit2,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Map, Marker } from 'pigeon-maps';
 import { Checkbox } from '@/components/ui/checkbox';
 import { api } from '@/lib/api';
@@ -104,6 +106,7 @@ const ImageDetailModal = ({
     hasPrevious,
 }) => {
     const { aiStatus } = useAIStatus();
+    const navigate = useNavigate();
     const [markFaces, setMarkFaces] = useState(false);
     const [imageRect, setImageRect] = useState({ left: 0, top: 0, width: 0, height: 0 });
     const [description, setDescription] = useState('');
@@ -112,6 +115,7 @@ const ImageDetailModal = ({
     const [isSaving, setIsSaving] = useState(false);
     const [isAnalysing, setIsAnalysing] = useState(false);
     const [isRunningOCR, setIsRunningOCR] = useState(false);
+    const [isDetectingFaces, setIsDetectingFaces] = useState(false);
     const [embeddings, setEmbeddings] = useState(null);
     const [details, setDetails] = useState(null);
     const [showInfo, setShowInfo] = useState(false);
@@ -361,6 +365,31 @@ const ImageDetailModal = ({
             toast({ title: 'OCR failed', variant: 'destructive', description: err.message });
         } finally {
             setIsRunningOCR(false);
+        }
+    };
+
+    const handleRerunFaceAnalysis = async () => {
+        setIsDetectingFaces(true);
+        try {
+            await api.face.detect(image.full_path);
+            const data = await api.images.getDetails(image.full_path);
+            setDetails(data);
+            if (data?.albums) {
+                setAlbums(data.albums);
+            }
+            if (onUpdate) onUpdate();
+            toast({
+                title: 'Detection complete',
+                description: 'Face detection completed successfully.',
+            });
+        } catch (err) {
+            toast({
+                title: 'Detection failed',
+                variant: 'destructive',
+                description: err.message,
+            });
+        } finally {
+            setIsDetectingFaces(false);
         }
     };
 
@@ -941,6 +970,54 @@ const ImageDetailModal = ({
                                 </div>
                             )}
 
+                            {/* People section */}
+                            {((image?.faces && image.faces.length > 0) ||
+                                (details?.faces && details.faces.length > 0)) && (
+                                <div className="px-4 mt-4">
+                                    <SectionHeader
+                                        action={
+                                            <button
+                                                onClick={() => setMarkFaces((v) => !v)}
+                                                className={`text-gray-500 hover:text-gray-200 transition-colors ${markFaces ? 'text-indigo-400 hover:text-indigo-300' : ''}`}
+                                                title="Toggle marking faces on image"
+                                            >
+                                                <Edit2 className="w-4 h-4" strokeWidth={1.5} />
+                                            </button>
+                                        }
+                                    >
+                                        People
+                                    </SectionHeader>
+                                    <div className="flex flex-wrap gap-4 pt-2">
+                                        {(image?.faces || details?.faces || []).map((face) => (
+                                            <div
+                                                key={face.id}
+                                                onClick={() => {
+                                                    if (face.name) {
+                                                        navigate(
+                                                            `/timeline?person=${encodeURIComponent(face.name)}`
+                                                        );
+                                                        onClose();
+                                                    }
+                                                }}
+                                                className={`flex flex-col items-center gap-1.5 ${face.name ? 'cursor-pointer group/people' : ''}`}
+                                            >
+                                                <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-transparent group-hover/people:border-indigo-500 transition-all bg-zinc-800 shadow-sm relative">
+                                                    <img
+                                                        src={api.face.getFaceThumbnailUrl(face.id)}
+                                                        alt={face.name || 'Unnamed'}
+                                                        className="w-full h-full object-cover"
+                                                        loading="lazy"
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-gray-300 group-hover/people:text-white max-w-[72px] truncate text-center font-light">
+                                                    {face.name || 'Unnamed'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Description Section */}
                             <div className="mt-6 px-4">
                                 <SectionHeader>Description</SectionHeader>
@@ -1340,6 +1417,22 @@ const ImageDetailModal = ({
                                         className={`w-4 h-4 shrink-0 object-contain ${isAnalysing ? 'animate-spin' : ''}`}
                                     />
                                     {isAnalysing ? 'Analysing…' : 'AI Analyse'}
+                                </button>
+
+                                <button
+                                    onClick={handleRerunFaceAnalysis}
+                                    disabled={isDetectingFaces}
+                                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-gray-300 hover:bg-white/[0.08] hover:text-white transition-all disabled:opacity-40 mb-2"
+                                >
+                                    <ScanFace
+                                        className={`w-4 h-4 shrink-0 text-gray-400 ${isDetectingFaces ? 'animate-spin' : ''}`}
+                                        strokeWidth={1.6}
+                                    />
+                                    {isDetectingFaces
+                                        ? 'Detecting Faces…'
+                                        : image?.face_analysed || details?.face_analysed
+                                          ? 'Redetect Faces'
+                                          : 'Detect Faces'}
                                 </button>
 
                                 <button
