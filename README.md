@@ -30,8 +30,8 @@ Pycasa is a self-hosted photo management application that runs entirely on your 
 - **Vector embeddings** — semantic search powered by local embedding models
 - **Folder monitoring** — add any folder on your machine; Pycasa scans and indexes it automatically
 - **Tag filtering & search** — find photos by tags, date, or description
-- **Embedded database** — uses [Couchbase Lite](https://www.couchbase.com/products/lite/) — no external database to install or manage
-- **Single binary** — ships as a self-contained jar with the UI bundled inside
+- **Embedded database** — uses SQLite — no external database to install or manage
+- **Dockerized** — easy deployment with a single command on any platform
 
 ## Roadmap
 
@@ -51,33 +51,24 @@ Pycasa is a self-hosted photo management application that runs entirely on your 
 
 ## Quick Start
 
-### One-liner install (requires Java 17+)
+### Run with Docker
+
+The fastest way to get started is by running the Pycasa Docker container:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Pycasa/Pycasa/main/install.sh | bash
+docker run -d -p 3000:3000 -v ~/Pictures:/photos pycasa/pycasa:latest
 ```
 
-The script downloads the latest release JAR to `~/.pycasa/`, installs a `pycasa` launcher to `/usr/local/bin`, and prints the URL to open.
-
-```bash
-pycasa                  # starts on default port 3000
-pycasa --port 8080      # starts on a custom port
-```
-
-Or run directly with Java:
-
-```bash
-java -jar ~/.pycasa/pycasa.jar
-java -Dquarkus.http.port=8080 -jar ~/.pycasa/pycasa.jar
-```
+This starts Pycasa on **http://localhost:3000** and mounts your local `~/Pictures` directory to the `/photos` folder inside the container.
 
 ### Prerequisites
 
+To run or build Pycasa locally, make sure you have the following installed:
+
 | Tool | Version |
 |------|---------|
-| Java | 17+ |
-| Maven | 3.8+ |
-| Node.js | 18+ |
+| Python | 3.11+ |
+| Node.js | 20+ |
 | [Ollama](https://ollama.com) | any (optional, for AI features) |
 
 ### Run in dev mode
@@ -86,16 +77,18 @@ java -Dquarkus.http.port=8080 -jar ~/.pycasa/pycasa.jar
 make dev
 ```
 
-Opens at **http://localhost:3000** — UI hot-reloads on file save, Java reloads on next request.
+This runs the FastAPI python server and Vite React frontend concurrently in development mode. The frontend opens at **http://localhost:3000** with hot reloading enabled, and the backend automatically hot-reloads on python code changes.
 
-### Build a production jar
+### Build & Run Production locally
+
+To build the React production bundle and run the uvicorn production server:
 
 ```bash
 make build
-java -jar target/pycasa-server-*-runner.jar
+.venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 3000
 ```
 
-The jar includes the full UI. No separate web server needed.
+The production assets will be built into `src/main/webapp/dist` and served statically by the FastAPI server.
 
 ## BYOAI (optional)
 
@@ -131,10 +124,11 @@ API playground is available at **http://localhost:3000/docs** when the server is
 ## Tech Stack
 
 **Backend**
-- [Quarkus](https://quarkus.io) — Java 17, fast startup, dev mode with hot reload
-- [Couchbase Lite](https://www.couchbase.com/products/lite/) — embedded NoSQL, zero config
-- [Ollama4j](https://github.com/ollama4j/ollama4j) — Ollama client for Java
-- [Tess4J](https://tess4j.sourceforge.net) — Tesseract OCR wrapper
+- [FastAPI](https://fastapi.tiangolo.com/) — Python 3.11 web framework, fast startup, automatic OpenAPI docs
+- [SQLite](https://www.sqlite.org/) — light and robust SQL database embedded as a file
+- [SQLAlchemy](https://www.sqlalchemy.org/) — Database ORM
+- [Pillow](https://python-pillow.org/) — image processing & metadata extraction
+- [face-recognition](https://github.com/ageitgey/face_recognition) — local face detection and clustering
 
 **Frontend**
 - [React 18](https://react.dev) + [Vite 5](https://vitejs.dev)

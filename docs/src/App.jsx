@@ -120,13 +120,13 @@ const features = [
         icon: '🗄️',
         color: 'orange',
         title: 'Zero-Config Database',
-        desc: 'Powered by Couchbase Lite — an embedded NoSQL database. No external database to install, configure, or maintain.',
+        desc: 'Powered by SQLite — a lightweight, embedded relational database. No external database to install, configure, or maintain.',
     },
     {
-        icon: '📦',
+        icon: '🐳',
         color: 'teal',
-        title: 'Single Binary Deploy',
-        desc: 'Ships as a self-contained JAR with the full React UI bundled inside. One file, one command, done.',
+        title: 'Docker Deployment',
+        desc: 'Runs as a lightweight container with the React UI and FastAPI server bundled together. Deploy with one command.',
     },
     {
         icon: '🌙',
@@ -143,20 +143,13 @@ const features = [
 ];
 
 const installCommands = {
-    jar: {
-        comment: '# One-liner install — requires Java 17+',
-        cmd: 'curl -fsSL https://raw.githubusercontent.com/Pycasa/Pycasa/main/install.sh | bash',
-    },
-    // gh_docker: {
-    //   comment: '# Run with Docker. Get your GitHub token from https://github.com/settings/tokens',
-    //   cmd: 'echo <GITHUB_TOKEN> | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin; docker run -d -p 8080:8080 -v ~/Pictures:/photos --name pycasa ghcr.io/Pycasa/pycasa:latest',
-    // },
     docker: {
-        cmd: 'docker run -d -p 8080:8080 -v ~/Pictures:/photos pycasa/pycasa:latest',
+        comment: '# Run Pycasa with Docker',
+        cmd: 'docker run -d -p 3000:3000 -v ~/Pictures:/photos pycasa/pycasa:latest',
     },
     build: {
-        comment: '# Build from source',
-        cmd: 'git clone https://github.com/Pycasa/Pycasa.git && cd Pycasa && make build && java -jar target/pycasa-server-*-runner.jar',
+        comment: '# Build and run locally from source',
+        cmd: 'git clone https://github.com/Pycasa/Pycasa.git && cd Pycasa && make build && .venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 3000',
     },
 };
 
@@ -201,7 +194,7 @@ const aiProviders = [
 
 export default function App() {
     const [page, setPage] = useState('home');
-    const [activeTab, setActiveTab] = useState('windows');
+    const [activeTab, setActiveTab] = useState('docker');
     const [activeScreenshot, setActiveScreenshot] = useState('timeline');
     const [copied, setCopied] = useState(false);
     const [ssPaused, setSsPaused] = useState(false);
@@ -321,9 +314,9 @@ export default function App() {
                     </div>
                     <div className="hero-pills">
                         <span className="pill">🔒 100% Private</span>
-                        <span className="pill">⚡ Quarkus + React</span>
+                        <span className="pill">⚡ FastAPI + React</span>
                         <span className="pill">🤖 Ollama / Gemini / OpenAI</span>
-                        <span className="pill">📦 Single JAR</span>
+                        <span className="pill">🐳 Docker</span>
                     </div>
                 </section>
 
@@ -491,10 +484,10 @@ export default function App() {
                             {
                                 label: 'Backend',
                                 items: [
-                                    'Quarkus 3.6 (Java 17)',
-                                    'Couchbase Lite',
-                                    'Ollama4j',
-                                    'Tess4J (OCR)',
+                                    'FastAPI (Python 3.11)',
+                                    'SQLite',
+                                    'SQLAlchemy',
+                                    'face-recognition & Pillow',
                                 ],
                             },
                             {
@@ -526,8 +519,8 @@ export default function App() {
                 <section id="install" className="section-install">
                     <h2 className="section-title">Get up and running</h2>
                     <p className="section-sub">
-                        Pycasa requires Java 17+. Ollama is optional but recommended for AI
-                        features.
+                        Pycasa requires Docker or Python 3.11+. Ollama is optional but recommended
+                        for AI features.
                     </p>
 
                     <div className="terminal-box">
@@ -537,8 +530,6 @@ export default function App() {
                             <span className="dot green" />
                             <div className="terminal-tabs">
                                 {Object.entries({
-                                    windows: 'Windows',
-                                    jar: 'JAR',
                                     docker: 'Docker',
                                     build: 'Build From Source',
                                 }).map(([k, label]) => (
@@ -551,47 +542,22 @@ export default function App() {
                                     </button>
                                 ))}
                             </div>
-                            {activeTab !== 'windows' && (
-                                <button className="copy-btn" onClick={copyToClipboard} title="Copy">
-                                    {copied ? <CheckIcon /> : <CopyIcon />}
-                                </button>
-                            )}
+                            <button className="copy-btn" onClick={copyToClipboard} title="Copy">
+                                {copied ? <CheckIcon /> : <CopyIcon />}
+                            </button>
                         </div>
 
-                        {activeTab === 'windows' ? (
-                            <div className="windows-download-body">
-                                <div className="windows-download-icon">
-                                    <img src="./site-images/windows.png" alt="Windows" />
-                                </div>
-                                <div className="windows-download-info">
-                                    <div className="windows-download-title">Pycasa for Windows</div>
-                                    <div className="windows-download-version">
-                                        Latest release:{' '}
-                                        <span className="windows-version-tag">{latestVersion}</span>
-                                    </div>
-                                    <div className="windows-download-note">
-                                        Windows 10 / 11 · 64-bit installer · Requires Java 17+
-                                    </div>
-                                </div>
-                                <a
-                                    href={`https://github.com/Pycasa/Pycasa/releases/download/${latestVersion}/PycasaSetup-${latestVersion}.exe`}
-                                    className="windows-download-btn"
-                                    download
-                                >
-                                    <DownloadIcon /> Download .exe
-                                </a>
-                            </div>
-                        ) : (
-                            <div className="terminal-body">
+                        <div className="terminal-body">
+                            {installCommands[activeTab].comment && (
                                 <div className="t-comment">
                                     {installCommands[activeTab].comment}
                                 </div>
-                                <div className="t-line">
-                                    <span className="t-prompt">$</span>
-                                    <span className="t-cmd">{installCommands[activeTab].cmd}</span>
-                                </div>
+                            )}
+                            <div className="t-line">
+                                <span className="t-prompt">$</span>
+                                <span className="t-cmd">{installCommands[activeTab].cmd}</span>
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     <div className="default-creds">
