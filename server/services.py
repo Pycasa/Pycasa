@@ -18,6 +18,14 @@ from .database import get_db, DB_DIR, log_event
 
 logger = logging.getLogger("pycasa.services")
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    logger.info("Registered pillow-heif opener successfully.")
+except ImportError:
+    logger.warning("pillow-heif is not installed; HEIC/HEIF support is disabled.")
+
+
 # Supported image extensions
 IMAGE_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".heic", ".heif"

@@ -26,6 +26,14 @@ from .services import (
 
 logger = logging.getLogger("pycasa.main")
 
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    logger.info("Registered pillow-heif opener successfully in main.py.")
+except ImportError:
+    logger.warning("pillow-heif is not installed; HEIC/HEIF support is disabled in main.py.")
+
+
 from .admin import create_admin
 
 app = FastAPI(title="Pycasa API", docs_url="/docs")
@@ -1003,8 +1011,41 @@ def trigger_scan():
 def get_raw_image(path: str):
     if not path or not os.path.exists(path) or not os.path.isfile(path):
         raise HTTPException(status_code=404)
+
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".heic", ".heif"):
+        transcode_dir = os.path.join(DB_DIR, "transcode")
+        os.makedirs(transcode_dir, exist_ok=True)
+        import hashlib
+        path_hash = hashlib.md5(path.encode("utf-8")).hexdigest()
+        cached_file = os.path.join(transcode_dir, f"{path_hash}.jpg")
+
+        should_generate = True
+        if os.path.exists(cached_file):
+            try:
+                actual_mtime = os.path.getmtime(path)
+                cached_mtime = os.path.getmtime(cached_file)
+                if cached_mtime >= actual_mtime:
+                    should_generate = False
+            except Exception:
+                pass
+
+        if should_generate:
+            try:
+                with Image.open(path) as pil_img:
+                    pil_img = ImageOps.exif_transpose(pil_img)
+                    if pil_img.mode in ("RGBA", "P"):
+                        pil_img = pil_img.convert("RGB")
+                    pil_img.save(cached_file, "JPEG", quality=90)
+            except Exception as e:
+                logger.error(f"Failed to transcode HEIC/HEIF image {path} to JPEG: {e}")
+                return FileResponse(path, headers={"Cache-Control": "max-age=86400"})
+
+        return FileResponse(cached_file, media_type="image/jpeg", headers={"Cache-Control": "max-age=86400"})
+
     # Add cache headers
     return FileResponse(path, headers={"Cache-Control": "max-age=86400"})
+
 
 @app.get("/api/images/thumbnail")
 def get_thumbnail(path: str):
