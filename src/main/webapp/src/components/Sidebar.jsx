@@ -756,7 +756,7 @@ const Sidebar = ({ username, onLogout, activeTab, onItemClick }) => {
                     })()}
 
                 {!isCollapsed && (
-                    <div className="bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.06]">
+                    <div className="hidden bg-slate-200/30 dark:bg-white/[0.04] p-3 rounded-xl border border-slate-200/80 dark:border-white/[0.06]">
                         <div className="flex justify-between items-center text-[10px] font-semibold text-slate-400 dark:text-white/40 mb-2">
                             <span>Storage space</span>
                         </div>
