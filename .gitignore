@@ -29,3 +29,5 @@ apps/windows/installer_small.bmp
 .venv/
 __pycache__/
 *.pyc
+
+node_modules

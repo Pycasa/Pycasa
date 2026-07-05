@@ -130,3 +130,16 @@ docs-serve: clean-docs
 	@echo "Starting docs development server..."
 	@cd docs && [ -d node_modules ] || npm install
 	@cd docs && npm run dev
+
+# ==============================
+# Generate demo image screenshots
+# ==============================
+screenshot: playwright-install
+	@echo "Running browser automation to capture screenshots..."
+	@node demo-screenshotter/demo-image-screenshotter.js
+	@echo "Done! Screenshots saved."
+
+#install playwright and chromium
+playwright-install:
+	@cd demo-screenshotter && npm install playwright
+	@cd demo-screenshotter && npx playwright install chromium
