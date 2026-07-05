@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api } from '@/lib/api';
@@ -14,7 +13,7 @@ const ProtectedRoute = ({ children }) => {
                 const session = await api.auth.getSession();
                 setSession(session);
             } catch (error) {
-                console.error("Session check failed:", error);
+                console.error('Session check failed:', error);
                 setSession(null);
             } finally {
                 setLoading(false);

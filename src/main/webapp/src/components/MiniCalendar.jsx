@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
 import {
-    format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-    addMonths, subMonths, eachDayOfInterval, isSameMonth, isSameDay,
-    isAfter, isBefore, parseISO
+    format,
+    startOfMonth,
+    endOfMonth,
+    startOfWeek,
+    endOfWeek,
+    addMonths,
+    subMonths,
+    eachDayOfInterval,
+    isSameMonth,
+    isSameDay,
+    isAfter,
+    isBefore,
+    parseISO,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -24,14 +34,14 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
     const [viewMonth, setViewMonth] = useState(selected ?? today);
 
     const monthStart = startOfMonth(viewMonth);
-    const monthEnd   = endOfMonth(viewMonth);
-    const gridStart  = startOfWeek(monthStart, { weekStartsOn: 1 });
-    const gridEnd    = endOfWeek(monthEnd,   { weekStartsOn: 1 });
-    const days       = eachDayOfInterval({ start: gridStart, end: gridEnd });
+    const monthEnd = endOfMonth(viewMonth);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
 
     const isDisabled = (day) => {
         if (min && isBefore(day, min)) return true;
-        if (max && isAfter(day, max))  return true;
+        if (max && isAfter(day, max)) return true;
         return false;
     };
 
@@ -49,17 +59,17 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
             {/* Month navigation */}
             <div className="flex items-center justify-between px-1 pb-2">
                 <button
-                    onClick={() => setViewMonth(m => subMonths(m, 1))}
-                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                    onClick={() => setViewMonth((m) => subMonths(m, 1))}
+                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/50 transition-colors"
                 >
                     <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <span className="text-xs font-semibold text-slate-700 dark:text-white/80">
                     {format(viewMonth, 'MMMM yyyy')}
                 </span>
                 <button
-                    onClick={() => setViewMonth(m => addMonths(m, 1))}
-                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                    onClick={() => setViewMonth((m) => addMonths(m, 1))}
+                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/50 transition-colors"
                 >
                     <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -67,8 +77,11 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
 
             {/* Weekday headers */}
             <div className="grid grid-cols-7 mb-1">
-                {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
-                    <div key={d} className="text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 py-0.5">
+                {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((d) => (
+                    <div
+                        key={d}
+                        className="text-center text-[10px] font-bold text-slate-400 dark:text-white/30 py-0.5"
+                    >
                         {d}
                     </div>
                 ))}
@@ -76,11 +89,11 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
 
             {/* Day grid */}
             <div className="grid grid-cols-7 gap-y-0.5">
-                {days.map(day => {
-                    const outside   = !isSameMonth(day, viewMonth);
-                    const sel       = selected && isSameDay(day, selected);
-                    const todayDay  = isSameDay(day, today);
-                    const disabled  = isDisabled(day);
+                {days.map((day) => {
+                    const outside = !isSameMonth(day, viewMonth);
+                    const sel = selected && isSameDay(day, selected);
+                    const todayDay = isSameDay(day, today);
+                    const disabled = isDisabled(day);
 
                     return (
                         <button
@@ -92,11 +105,13 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
                                 sel
                                     ? 'bg-primary text-white font-semibold'
                                     : todayDay && !outside
-                                    ? 'bg-primary/10 text-primary font-semibold dark:bg-primary/20'
-                                    : outside
-                                    ? 'text-slate-300 dark:text-slate-600'
-                                    : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700',
-                                disabled && !sel ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer',
+                                      ? 'bg-primary/10 text-primary font-semibold dark:bg-primary/20'
+                                      : outside
+                                        ? 'text-slate-300 dark:text-white/20'
+                                        : 'text-slate-700 dark:text-white/80 hover:bg-slate-100 dark:hover:bg-white/10',
+                                disabled && !sel
+                                    ? 'opacity-30 cursor-not-allowed'
+                                    : 'cursor-pointer',
                             ].join(' ')}
                         >
                             {format(day, 'd')}
@@ -106,7 +121,7 @@ const MiniCalendar = ({ value, onChange, minDate, maxDate }) => {
             </div>
 
             {/* Today / Clear actions */}
-            <div className="flex justify-between mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <div className="flex justify-between mt-2 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
                 <button
                     onClick={() => {
                         const t = format(today, 'yyyy-MM-dd');

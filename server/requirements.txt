@@ -1,0 +1,10 @@
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+pydantic>=2.0
+httpx>=0.24.0
+pillow>=9.0.0
+python-multipart
+sqlalchemy>=2.0
+sqladmin>=0.16
+face-recognition
+setuptools<70

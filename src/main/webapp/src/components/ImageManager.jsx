@@ -1,9 +1,22 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/lib/api';
-import Navbar from './Navbar';
 import ImageCard from './ImageCard';
 import ImageDetailModal from './ImageDetailModal';
-import { Loader2, Image as ImageIcon, Search, Filter, SortAsc, SortDesc, Tag as TagIcon, Folder as FolderIcon, X, Calendar, HardDrive, FileType } from 'lucide-react';
+import {
+    Loader2,
+    Image as ImageIcon,
+    Search,
+    Filter,
+    SortAsc,
+    SortDesc,
+    Tag as TagIcon,
+    Folder as FolderIcon,
+    X,
+    Calendar,
+    HardDrive,
+    FileType,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,42 +26,43 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+} from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import MiniCalendar from './MiniCalendar';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const KNOWN_EXTENSIONS = [
     { group: 'JPEG', exts: ['jpg', 'jpeg'] },
-    { group: 'PNG',  exts: ['png'] },
-    { group: 'GIF',  exts: ['gif'] },
+    { group: 'PNG', exts: ['png'] },
+    { group: 'GIF', exts: ['gif'] },
     { group: 'WebP', exts: ['webp'] },
     { group: 'HEIC', exts: ['heic', 'heif'] },
     { group: 'TIFF', exts: ['tiff', 'tif'] },
-    { group: 'BMP',  exts: ['bmp'] },
-    { group: 'RAW',  exts: ['raw', 'cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2'] },
-    { group: 'SVG',  exts: ['svg'] },
+    { group: 'BMP', exts: ['bmp'] },
+    { group: 'RAW', exts: ['raw', 'cr2', 'cr3', 'nef', 'arw', 'dng', 'orf', 'rw2'] },
+    { group: 'SVG', exts: ['svg'] },
     { group: 'AVIF', exts: ['avif'] },
 ];
 
 const SIZE_PRESETS = [
-    { label: 'Any size',      min: null,        max: null },
-    { label: '< 500 KB',      min: null,        max: 500_000 },
-    { label: '500 KB – 2 MB', min: 500_000,     max: 2_000_000 },
-    { label: '2 MB – 10 MB',  min: 2_000_000,   max: 10_000_000 },
-    { label: '> 10 MB',       min: 10_000_000,  max: null },
+    { label: 'Any size', min: null, max: null },
+    { label: '< 500 KB', min: null, max: 500_000 },
+    { label: '500 KB – 2 MB', min: 500_000, max: 2_000_000 },
+    { label: '2 MB – 10 MB', min: 2_000_000, max: 10_000_000 },
+    { label: '> 10 MB', min: 10_000_000, max: null },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ImageManager = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const queryParam = new URLSearchParams(location.search).get('q') || '';
+    const showAiOnly = new URLSearchParams(location.search).get('ai') === 'true';
+
     const [images, setImages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
@@ -57,13 +71,26 @@ const ImageManager = () => {
     const containerRef = useRef(null);
 
     // Filter States
-    const [search, setSearch] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [search, setSearch] = useState(queryParam);
+    const [debouncedSearch, setDebouncedSearch] = useState(queryParam);
     const [folderId, setFolderId] = useState('all');
     const [sortBy, setSortBy] = useState('modified_at');
     const [sortOrder, setSortOrder] = useState('DESC');
     const [selectedTags, setSelectedTags] = useState([]);
     const [tagSearchQuery, setTagSearchQuery] = useState('');
+    const [gridSize, setGridSize] = useState(
+        () => localStorage.getItem('pycasa-grid-size') || 'md'
+    );
+
+    // Sync search input when url query parameter changes (e.g. from global search)
+    useEffect(() => {
+        setSearch(queryParam);
+    }, [queryParam]);
+
+    // Sync grid size selection to local storage
+    useEffect(() => {
+        localStorage.setItem('pycasa-grid-size', gridSize);
+    }, [gridSize]);
 
     // New filter states
     const [dateFrom, setDateFrom] = useState('');
@@ -92,18 +119,29 @@ const ImageManager = () => {
 
     useEffect(() => {
         fetchImages(1, true);
-    }, [debouncedSearch, folderId, selectedTags, sortBy, sortOrder, dateFrom, dateTo, selectedExtGroups, sizePresetIdx]);
+    }, [
+        debouncedSearch,
+        folderId,
+        selectedTags,
+        sortBy,
+        sortOrder,
+        dateFrom,
+        dateTo,
+        selectedExtGroups,
+        sizePresetIdx,
+        showAiOnly,
+    ]);
 
     const fetchInitialData = async () => {
         try {
             const [tags, folders] = await Promise.all([
                 api.images.getTags(),
-                api.folders.listMonitored()
+                api.folders.listMonitored(),
             ]);
             setAvailableTags(tags || []);
             setMonitoredFolders(folders || []);
         } catch (error) {
-            console.error("Failed to fetch filter options:", error);
+            console.error('Failed to fetch filter options:', error);
         }
     };
 
@@ -117,19 +155,36 @@ const ImageManager = () => {
 
             // Resolve date range — date_from is start of day, date_to is end of day
             const dateFromMs = dateFrom ? new Date(dateFrom).setHours(0, 0, 0, 0) : null;
-            const dateToMs   = dateTo   ? new Date(dateTo).setHours(23, 59, 59, 999) : null;
+            const dateToMs = dateTo ? new Date(dateTo).setHours(23, 59, 59, 999) : null;
 
             // Resolve extensions from selected groups
-            const extensions = selectedExtGroups.length > 0
-                ? selectedExtGroups.flatMap(g => KNOWN_EXTENSIONS.find(k => k.group === g)?.exts ?? [])
-                : null;
+            const extensions =
+                selectedExtGroups.length > 0
+                    ? selectedExtGroups.flatMap(
+                          (g) => KNOWN_EXTENSIONS.find((k) => k.group === g)?.exts ?? []
+                      )
+                    : null;
 
             // Resolve size range from preset
             const { min: sizeMin, max: sizeMax } = SIZE_PRESETS[sizePresetIdx];
 
             const newImages = await api.images.list(
-                fId, debouncedSearch, selectedTags, sortBy, sortOrder, pageNum, limit,
-                dateFromMs, dateToMs, extensions, sizeMin, sizeMax
+                fId,
+                debouncedSearch,
+                selectedTags,
+                sortBy,
+                sortOrder,
+                pageNum,
+                limit,
+                dateFromMs,
+                dateToMs,
+                extensions,
+                sizeMin,
+                sizeMax,
+                null, // favorite
+                false, // trashed
+                null, // albumId
+                showAiOnly ? true : null // aiAnalysed
             );
 
             if (Array.isArray(newImages)) {
@@ -137,9 +192,9 @@ const ImageManager = () => {
                     setImages(newImages);
                     if (containerRef.current) containerRef.current.scrollTop = 0;
                 } else {
-                    setImages(prev => {
-                        const existingIds = new Set(prev.map(img => img.id));
-                        const uniqueNew = newImages.filter(img => !existingIds.has(img.id));
+                    setImages((prev) => {
+                        const existingIds = new Set(prev.map((img) => img.id));
+                        const uniqueNew = newImages.filter((img) => !existingIds.has(img.id));
                         return [...prev, ...uniqueNew];
                     });
                 }
@@ -153,6 +208,14 @@ const ImageManager = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const handleUpload = () => {
+            fetchImages(1, true);
+        };
+        window.addEventListener('pycasa-image-uploaded', handleUpload);
+        return () => window.removeEventListener('pycasa-image-uploaded', handleUpload);
+    }, []);
 
     const loadMore = useCallback(() => {
         if (!loading && hasMore) {
@@ -182,18 +245,18 @@ const ImageManager = () => {
     }, [hasMore, loading, loadMore]);
 
     const toggleSortOrder = () => {
-        setSortOrder(prev => prev === 'ASC' ? 'DESC' : 'ASC');
+        setSortOrder((prev) => (prev === 'ASC' ? 'DESC' : 'ASC'));
     };
 
     const toggleTag = (tag) => {
-        setSelectedTags(prev =>
-            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+        setSelectedTags((prev) =>
+            prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
         );
     };
 
     const toggleExtGroup = (group) => {
-        setSelectedExtGroups(prev =>
-            prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]
+        setSelectedExtGroups((prev) =>
+            prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group]
         );
     };
 
@@ -207,10 +270,18 @@ const ImageManager = () => {
         setDateTo('');
         setSelectedExtGroups([]);
         setSizePresetIdx(0);
+        navigate('/gallery');
     };
 
-    const hasActiveFilters = search || folderId !== 'all' || selectedTags.length > 0
-        || dateFrom || dateTo || selectedExtGroups.length > 0 || sizePresetIdx !== 0;
+    const hasActiveFilters =
+        search ||
+        folderId !== 'all' ||
+        selectedTags.length > 0 ||
+        dateFrom ||
+        dateTo ||
+        selectedExtGroups.length > 0 ||
+        sizePresetIdx !== 0 ||
+        showAiOnly;
 
     const modalImage = useMemo(() => {
         if (!selectedImage) return null;
@@ -222,7 +293,13 @@ const ImageManager = () => {
         };
     }, [selectedImage]);
 
-    if (loading && images.length === 0 && !debouncedSearch && folderId === 'all' && selectedTags.length === 0) {
+    if (
+        loading &&
+        images.length === 0 &&
+        !debouncedSearch &&
+        folderId === 'all' &&
+        selectedTags.length === 0
+    ) {
         return (
             <div className="flex h-[calc(100vh-4rem)] items-center justify-center bg-white dark:bg-slate-900">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -231,24 +308,13 @@ const ImageManager = () => {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900 overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50 dark:bg-[#09090b] overflow-hidden">
             {/* Filter Bar */}
-            <div className="bg-white dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 px-8 py-4 space-y-4 shadow-sm z-10">
+            <div className="bg-white dark:bg-[#09090b] border-b border-slate-200 dark:border-white/[0.06] px-8 py-4 space-y-4 shadow-sm z-10">
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Search */}
-                    <div className="relative flex-grow max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <Input
-                            placeholder="Search images by name or description..."
-                            className="pl-10 text-sm h-10 bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 focus:bg-white dark:focus:bg-slate-700 transition-all"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                    </div>
-
                     {/* Folder Filter */}
                     <Select value={folderId} onValueChange={setFolderId}>
-                        <SelectTrigger className="w-[180px] h-10 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600">
+                        <SelectTrigger className="w-[180px] h-10 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 dark:text-white/80">
                             <div className="flex items-center gap-2">
                                 <FolderIcon className="w-4 h-4 text-slate-400 shrink-0" />
                                 <SelectValue placeholder="All Folders" />
@@ -256,7 +322,7 @@ const ImageManager = () => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Folders</SelectItem>
-                            {monitoredFolders.map(folder => (
+                            {monitoredFolders.map((folder) => (
                                 <SelectItem key={folder.id} value={folder.id}>
                                     {folder.label || folder.name}
                                 </SelectItem>
@@ -267,7 +333,7 @@ const ImageManager = () => {
                     {/* Sort By */}
                     <div className="flex items-center gap-1">
                         <Select value={sortBy} onValueChange={setSortBy}>
-                            <SelectTrigger className="w-[160px] h-10 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600">
+                            <SelectTrigger className="w-[160px] h-10 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 dark:text-white/80">
                                 <div className="flex items-center gap-2">
                                     <Filter className="w-4 h-4 text-slate-400 shrink-0" />
                                     <SelectValue placeholder="Sort By" />
@@ -286,7 +352,11 @@ const ImageManager = () => {
                             className="h-10 w-10 text-slate-500 hover:text-primary transition-colors"
                             onClick={toggleSortOrder}
                         >
-                            {sortOrder === 'DESC' ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />}
+                            {sortOrder === 'DESC' ? (
+                                <SortDesc className="w-4 h-4" />
+                            ) : (
+                                <SortAsc className="w-4 h-4" />
+                            )}
                         </Button>
                     </div>
 
@@ -295,36 +365,70 @@ const ImageManager = () => {
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 transition-all active:scale-95 ${dateActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${dateActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-white/60'}`}
                             >
                                 <Calendar className="w-4 h-4 mr-2" />
                                 Date
                                 {dateActive && (
-                                    <Badge variant="secondary" className="ml-2 bg-primary text-white border-none px-1.5 h-5 text-[10px]">
+                                    <Badge
+                                        variant="secondary"
+                                        className="ml-2 bg-primary text-white border-none px-1.5 h-5 text-[10px]"
+                                    >
                                         On
                                     </Badge>
                                 )}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-56 p-0 shadow-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800" align="start">
-                            <div className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Date Range</span>
+                        <PopoverContent
+                            className="w-56 p-0 shadow-xl border-slate-200 dark:border-white/[0.08]"
+                            align="start"
+                        >
+                            <div className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.03]">
+                                <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">
+                                    Date Range
+                                </span>
                                 {dateActive && (
-                                    <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-[10px] font-medium text-red-500 hover:text-red-600">Clear all</button>
+                                    <button
+                                        onClick={() => {
+                                            setDateFrom('');
+                                            setDateTo('');
+                                        }}
+                                        className="text-[10px] font-medium text-red-500 hover:text-red-600"
+                                    >
+                                        Clear all
+                                    </button>
                                 )}
                             </div>
                             <div className="p-3 space-y-3">
                                 <div>
                                     <span className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 block font-bold uppercase tracking-wider">
-                                        From {dateFrom && <span className="normal-case font-normal ml-1 text-primary">{dateFrom}</span>}
+                                        From{' '}
+                                        {dateFrom && (
+                                            <span className="normal-case font-normal ml-1 text-primary">
+                                                {dateFrom}
+                                            </span>
+                                        )}
                                     </span>
-                                    <MiniCalendar value={dateFrom || null} maxDate={dateTo || null} onChange={setDateFrom} />
+                                    <MiniCalendar
+                                        value={dateFrom || null}
+                                        maxDate={dateTo || null}
+                                        onChange={setDateFrom}
+                                    />
                                 </div>
-                                <div className="border-t border-slate-100 dark:border-slate-700 pt-3">
+                                <div className="border-t border-slate-100 dark:border-white/[0.06] pt-3">
                                     <span className="text-[10px] text-slate-500 dark:text-slate-400 mb-2 block font-bold uppercase tracking-wider">
-                                        To {dateTo && <span className="normal-case font-normal ml-1 text-primary">{dateTo}</span>}
+                                        To{' '}
+                                        {dateTo && (
+                                            <span className="normal-case font-normal ml-1 text-primary">
+                                                {dateTo}
+                                            </span>
+                                        )}
                                     </span>
-                                    <MiniCalendar value={dateTo || null} minDate={dateFrom || null} onChange={setDateTo} />
+                                    <MiniCalendar
+                                        value={dateTo || null}
+                                        minDate={dateFrom || null}
+                                        onChange={setDateTo}
+                                    />
                                 </div>
                             </div>
                         </PopoverContent>
@@ -335,42 +439,60 @@ const ImageManager = () => {
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 transition-all active:scale-95 ${extActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${extActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-white/60'}`}
                             >
                                 <FileType className="w-4 h-4 mr-2" />
                                 Type
                                 {extActive && (
-                                    <Badge variant="secondary" className="ml-2 bg-primary text-white border-none px-1.5 h-5 text-[10px]">
+                                    <Badge
+                                        variant="secondary"
+                                        className="ml-2 bg-primary text-white border-none px-1.5 h-5 text-[10px]"
+                                    >
                                         {selectedExtGroups.length}
                                     </Badge>
                                 )}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-56 p-0 shadow-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800" align="start">
-                            <div className="p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex items-center justify-between">
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">File Type</span>
+                        <PopoverContent
+                            className="w-56 p-0 shadow-xl border-slate-200 dark:border-white/[0.08]"
+                            align="start"
+                        >
+                            <div className="p-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.03] flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">
+                                    File Type
+                                </span>
                                 {extActive && (
-                                    <button onClick={() => setSelectedExtGroups([])} className="text-[10px] font-medium text-red-500 hover:text-red-600">Clear</button>
+                                    <button
+                                        onClick={() => setSelectedExtGroups([])}
+                                        className="text-[10px] font-medium text-red-500 hover:text-red-600"
+                                    >
+                                        Clear
+                                    </button>
                                 )}
                             </div>
                             <div className="p-2 space-y-1">
                                 {KNOWN_EXTENSIONS.map(({ group, exts }) => (
                                     <div
                                         key={group}
-                                        className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                                        className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors cursor-pointer"
                                         onClick={() => toggleExtGroup(group)}
                                     >
                                         <Checkbox
                                             id={`ext-${group}`}
                                             checked={selectedExtGroups.includes(group)}
                                             onCheckedChange={() => toggleExtGroup(group)}
-                                            className="border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                            className="rounded border-slate-300 dark:border-white/20 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:data-[state=checked]:bg-blue-500 dark:data-[state=checked]:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"
                                         />
                                         <div className="flex-1 flex items-center justify-between">
-                                            <Label htmlFor={`ext-${group}`} className="text-xs font-medium cursor-pointer text-slate-700 dark:text-slate-200">
+                                            <Label
+                                                htmlFor={`ext-${group}`}
+                                                className="text-xs font-medium cursor-pointer text-slate-700 dark:text-slate-200"
+                                            >
                                                 {group}
                                             </Label>
-                                            <span className="text-[10px] text-slate-400 w-[84px]">{exts.join(', ')}</span>
+                                            <span className="text-[10px] text-slate-400 w-[84px]">
+                                                {exts.join(', ')}
+                                            </span>
                                         </div>
                                     </div>
                                 ))}
@@ -383,33 +505,58 @@ const ImageManager = () => {
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 transition-all active:scale-95 ${sizeActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${sizeActive ? 'border-primary text-primary' : 'text-slate-600 dark:text-white/60'}`}
                             >
                                 <HardDrive className="w-4 h-4 mr-2" />
                                 Size
                                 {sizeActive && (
-                                    <Badge variant="secondary" className="ml-2 bg-primary text-white border-none px-1.5 h-5 text-[10px]">
+                                    <Badge
+                                        variant="secondary"
+                                        className="ml-2 bg-primary text-white border-none px-1.5 h-5 text-[10px]"
+                                    >
                                         On
                                     </Badge>
                                 )}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-52 p-0 shadow-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800" align="start">
-                            <div className="p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex items-center justify-between">
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">File Size</span>
+                        <PopoverContent
+                            className="w-52 p-0 shadow-xl border-slate-200 dark:border-white/[0.08]"
+                            align="start"
+                        >
+                            <div className="p-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.03] flex items-center justify-between">
+                                <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">
+                                    File Size
+                                </span>
                                 {sizeActive && (
-                                    <button onClick={() => setSizePresetIdx(0)} className="text-[10px] font-medium text-red-500 hover:text-red-600">Clear</button>
+                                    <button
+                                        onClick={() => setSizePresetIdx(0)}
+                                        className="text-[10px] font-medium text-red-500 hover:text-red-600"
+                                    >
+                                        Clear
+                                    </button>
                                 )}
                             </div>
                             <div className="p-2 space-y-1">
                                 {SIZE_PRESETS.map((preset, idx) => (
                                     <div
                                         key={preset.label}
-                                        className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                                        className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors cursor-pointer"
                                         onClick={() => setSizePresetIdx(idx)}
                                     >
-                                        <div className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 transition-colors ${sizePresetIdx === idx ? 'bg-primary border-primary' : 'border-slate-300 dark:border-slate-500'}`} />
-                                        <span className={`text-xs ${sizePresetIdx === idx ? 'font-semibold text-primary' : 'text-slate-700 dark:text-slate-200'}`}>
+                                        <div
+                                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                                                sizePresetIdx === idx
+                                                    ? 'border-blue-600 dark:border-blue-500'
+                                                    : 'border-slate-300 dark:border-white/20 bg-transparent'
+                                            }`}
+                                        >
+                                            {sizePresetIdx === idx && (
+                                                <div className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-500 animate-in zoom-in-50 duration-150" />
+                                            )}
+                                        </div>
+                                        <span
+                                            className={`text-xs ${sizePresetIdx === idx ? 'font-semibold text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'}`}
+                                        >
                                             {preset.label}
                                         </span>
                                     </div>
@@ -423,21 +570,29 @@ const ImageManager = () => {
                         <PopoverTrigger asChild>
                             <Button
                                 variant="outline"
-                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 transition-all active:scale-95 ${selectedTags.length > 0 ? 'border-primary text-primary' : 'text-slate-600 dark:text-slate-300'}`}
+                                className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${selectedTags.length > 0 ? 'border-primary text-primary' : 'text-slate-600 dark:text-white/60'}`}
                             >
                                 <TagIcon className="w-4 h-4 mr-2" />
                                 Tags
                                 {selectedTags.length > 0 && (
-                                    <Badge variant="secondary" className="ml-2 bg-primary text-white border-none px-1.5 h-5 text-[10px]">
+                                    <Badge
+                                        variant="secondary"
+                                        className="ml-2 bg-primary text-white border-none px-1.5 h-5 text-[10px]"
+                                    >
                                         {selectedTags.length}
                                     </Badge>
                                 )}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-64 p-0 shadow-xl border-slate-200 dark:border-slate-700 dark:bg-slate-800" align="start">
-                            <div className="p-3 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30">
+                        <PopoverContent
+                            className="w-64 p-0 shadow-xl border-slate-200 dark:border-white/[0.08]"
+                            align="start"
+                        >
+                            <div className="p-3 border-b border-slate-100 dark:border-white/[0.06] bg-slate-50/50 dark:bg-white/[0.03]">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Filter by Tags</span>
+                                    <span className="text-xs font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">
+                                        Filter by Tags
+                                    </span>
                                     {selectedTags.length > 0 && (
                                         <button
                                             onClick={() => setSelectedTags([])}
@@ -450,7 +605,7 @@ const ImageManager = () => {
                                 <div className="relative">
                                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                                     <Input
-                                        className="h-8 pl-8 text-xs border-slate-200 dark:border-slate-600 focus:border-slate-300 focus:ring-0 transition-colors bg-white dark:bg-slate-700"
+                                        className="h-8 pl-8 text-xs bg-slate-100 dark:bg-white/[0.05] border-slate-200 dark:border-white/10 text-slate-900 dark:text-gray-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 dark:focus-visible:ring-blue-400/10 focus-visible:border-blue-500 dark:focus-visible:border-blue-400/50 transition-colors"
                                         placeholder="Search tags..."
                                         value={tagSearchQuery}
                                         onChange={(e) => setTagSearchQuery(e.target.value)}
@@ -459,14 +614,20 @@ const ImageManager = () => {
                                 </div>
                             </div>
                             <div className="max-h-64 overflow-y-auto p-2 no-scrollbar">
-                                {availableTags.filter(t => t.toLowerCase().includes(tagSearchQuery.toLowerCase())).length > 0 ? (
+                                {availableTags.filter((t) =>
+                                    t.toLowerCase().includes(tagSearchQuery.toLowerCase())
+                                ).length > 0 ? (
                                     <div className="space-y-1">
                                         {availableTags
-                                            .filter(t => t.toLowerCase().includes(tagSearchQuery.toLowerCase()))
-                                            .map(tag => (
+                                            .filter((t) =>
+                                                t
+                                                    .toLowerCase()
+                                                    .includes(tagSearchQuery.toLowerCase())
+                                            )
+                                            .map((tag) => (
                                                 <div
                                                     key={tag}
-                                                    className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer group"
+                                                    className="flex items-center space-x-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-colors cursor-pointer group"
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         toggleTag(tag);
@@ -476,11 +637,11 @@ const ImageManager = () => {
                                                         id={`tag-${tag}`}
                                                         checked={selectedTags.includes(tag)}
                                                         onCheckedChange={() => toggleTag(tag)}
-                                                        className="border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                                        className="rounded border-slate-300 dark:border-white/20 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:data-[state=checked]:bg-blue-500 dark:data-[state=checked]:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20"
                                                     />
                                                     <Label
                                                         htmlFor={`tag-${tag}`}
-                                                        className="text-xs font-medium leading-none cursor-pointer flex-grow text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-slate-100 transition-colors"
+                                                        className="text-xs font-medium leading-none cursor-pointer flex-grow text-slate-600 dark:text-white/70 group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
                                                     >
                                                         {tag}
                                                     </Label>
@@ -489,12 +650,34 @@ const ImageManager = () => {
                                     </div>
                                 ) : (
                                     <div className="py-8 text-center text-xs text-slate-400">
-                                        {tagSearchQuery ? "No matching tags" : "No tags available"}
+                                        {tagSearchQuery ? 'No matching tags' : 'No tags available'}
                                     </div>
                                 )}
                             </div>
                         </PopoverContent>
                     </Popover>
+
+                    {/* ── AI Analysed Filter ── */}
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            const params = new URLSearchParams(location.search);
+                            if (showAiOnly) {
+                                params.delete('ai');
+                            } else {
+                                params.set('ai', 'true');
+                            }
+                            navigate(`/gallery?${params.toString()}`);
+                        }}
+                        className={`h-10 px-3 text-xs bg-slate-50 dark:bg-white/[0.06] border-slate-200 dark:border-white/10 transition-all active:scale-95 ${showAiOnly ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/20 font-semibold' : 'text-slate-600 dark:text-white/60'}`}
+                    >
+                        <img
+                            src="/site-images/ai-icon.png"
+                            alt="AI"
+                            className="w-4 h-4 mr-2 object-contain"
+                        />
+                        AI Analysed
+                    </Button>
 
                     {hasActiveFilters && (
                         <Button
@@ -510,13 +693,36 @@ const ImageManager = () => {
                 </div>
 
                 {/* Active filter chips row */}
-                {(selectedTags.length > 0 || selectedExtGroups.length > 0 || dateActive || sizeActive) && (
-                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
-                        {selectedTags.map(tag => (
+                {(selectedTags.length > 0 ||
+                    selectedExtGroups.length > 0 ||
+                    dateActive ||
+                    sizeActive ||
+                    showAiOnly) && (
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100 dark:border-white/[0.06]">
+                        {showAiOnly && (
+                            <Badge
+                                variant="default"
+                                className="bg-white dark:bg-white/[0.07] text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                onClick={() => {
+                                    const params = new URLSearchParams(location.search);
+                                    params.delete('ai');
+                                    navigate(`/gallery?${params.toString()}`);
+                                }}
+                            >
+                                <img
+                                    src="/site-images/ai-icon.png"
+                                    alt="AI"
+                                    className="w-3 h-3 object-contain"
+                                />
+                                AI Analysed Only
+                                <X className="w-3 h-3 text-slate-400 group-hover:text-red-500" />
+                            </Badge>
+                        )}
+                        {selectedTags.map((tag) => (
                             <Badge
                                 key={tag}
                                 variant="default"
-                                className="bg-white dark:bg-slate-700 text-primary border border-primary/20 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                className="bg-white dark:bg-white/[0.07] text-primary border border-primary/20 dark:border-primary/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
                                 onClick={() => toggleTag(tag)}
                             >
                                 <TagIcon className="w-2.5 h-2.5" />
@@ -524,11 +730,11 @@ const ImageManager = () => {
                                 <X className="w-3 h-3 text-slate-400 group-hover:text-red-500" />
                             </Badge>
                         ))}
-                        {selectedExtGroups.map(group => (
+                        {selectedExtGroups.map((group) => (
                             <Badge
                                 key={group}
                                 variant="default"
-                                className="bg-white dark:bg-slate-700 text-indigo-600 border border-indigo-200 dark:border-indigo-800 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                className="bg-white dark:bg-white/[0.07] text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
                                 onClick={() => toggleExtGroup(group)}
                             >
                                 <FileType className="w-2.5 h-2.5" />
@@ -539,8 +745,11 @@ const ImageManager = () => {
                         {dateActive && (
                             <Badge
                                 variant="default"
-                                className="bg-white dark:bg-slate-700 text-amber-600 border border-amber-200 dark:border-amber-800 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
-                                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                                className="bg-white dark:bg-white/[0.07] text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                onClick={() => {
+                                    setDateFrom('');
+                                    setDateTo('');
+                                }}
                             >
                                 <Calendar className="w-2.5 h-2.5" />
                                 {dateFrom || '…'} → {dateTo || '…'}
@@ -550,7 +759,7 @@ const ImageManager = () => {
                         {sizeActive && (
                             <Badge
                                 variant="default"
-                                className="bg-white dark:bg-slate-700 text-teal-600 border border-teal-200 dark:border-teal-800 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
+                                className="bg-white dark:bg-white/[0.07] text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-500/30 shadow-sm px-2 py-0.5 text-[10px] flex items-center gap-1.5 group hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-600 hover:border-red-200 transition-all cursor-pointer"
                                 onClick={() => setSizePresetIdx(0)}
                             >
                                 <HardDrive className="w-2.5 h-2.5" />
@@ -562,26 +771,74 @@ const ImageManager = () => {
                 )}
             </div>
 
-            <div
-                ref={containerRef}
-                className="flex-1 overflow-y-auto p-8 no-scrollbar"
-            >
+            <div ref={containerRef} className="flex-1 overflow-y-auto p-8 no-scrollbar relative">
                 {images.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-                        {images.map(image => (
-                            <ImageCard
-                                key={image.id || image.file_path}
-                                image={{ ...image, full_path: image.file_path, modified: image.modified_at, size: image.file_size }}
-                                isSelected={selectedImage?.id === image.id}
-                                onSelect={(img) => setSelectedImage(img)}
-                            />
-                        ))}
+                    <div className="flex flex-wrap gap-1">
+                        {images.map((image) => {
+                            const rHeight = gridSize === 'sm' ? 120 : gridSize === 'lg' ? 240 : 180;
+                            return (
+                                <ImageCard
+                                    key={image.id || image.file_path}
+                                    rowHeight={rHeight}
+                                    image={{
+                                        ...image,
+                                        full_path: image.file_path,
+                                        modified: image.modified_at,
+                                        size: image.file_size,
+                                    }}
+                                    isSelected={selectedImage?.id === image.id}
+                                    onSelect={(img) => setSelectedImage(img)}
+                                />
+                            );
+                        })}
+                        <div
+                            className="flex-grow-[100000] shrink"
+                            style={{ flexBasis: '0px', height: '0px' }}
+                        />
                     </div>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400">
                         <ImageIcon className="w-12 h-12 mb-4 opacity-20" />
                         <p className="text-lg font-medium">No images found.</p>
-                        <p className="text-sm">Try adjusting your filters or adding folders in Settings.</p>
+                        <p className="text-sm">
+                            Try adjusting your filters or adding folders in Settings.
+                        </p>
+                    </div>
+                )}
+
+                {/* ── Dynamic Grid Size Selector floating pill (Google Photos zoom style) ── */}
+                {images.length > 0 && (
+                    <div className="fixed bottom-5 right-10 flex items-center bg-white/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800/80 rounded-full shadow-lg p-1.5 z-20 space-x-1.5 backdrop-blur-md select-none scale-90 sm:scale-100">
+                        <button
+                            onClick={() => setGridSize('sm')}
+                            className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${
+                                gridSize === 'sm'
+                                    ? 'bg-primary text-white shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                        >
+                            Small
+                        </button>
+                        <button
+                            onClick={() => setGridSize('md')}
+                            className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${
+                                gridSize === 'md'
+                                    ? 'bg-primary text-white shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                        >
+                            Medium
+                        </button>
+                        <button
+                            onClick={() => setGridSize('lg')}
+                            className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${
+                                gridSize === 'lg'
+                                    ? 'bg-primary text-white shadow-sm'
+                                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                        >
+                            Large
+                        </button>
                     </div>
                 )}
                 {loading && images.length > 0 && (
@@ -597,23 +854,32 @@ const ImageManager = () => {
                 onClose={() => setSelectedImage(null)}
                 onUpdate={() => fetchImages(1)}
                 onNext={() => {
-                    const currentIndex = images.findIndex(img => img.id === selectedImage?.id);
+                    const currentIndex = images.findIndex((img) => img.id === selectedImage?.id);
                     if (currentIndex < images.length - 1) {
                         setSelectedImage(images[currentIndex + 1]);
                     }
                 }}
                 onPrevious={() => {
-                    const currentIndex = images.findIndex(img => img.id === selectedImage?.id);
+                    const currentIndex = images.findIndex((img) => img.id === selectedImage?.id);
                     if (currentIndex > 0) {
                         setSelectedImage(images[currentIndex - 1]);
                     }
                 }}
-                hasNext={selectedImage && (() => {
-                    return images.findIndex(img => img.id === selectedImage.id) < images.length - 1;
-                })()}
-                hasPrevious={selectedImage && (() => {
-                    return images.findIndex(img => img.id === selectedImage.id) > 0;
-                })()}
+                hasNext={
+                    selectedImage &&
+                    (() => {
+                        return (
+                            images.findIndex((img) => img.id === selectedImage.id) <
+                            images.length - 1
+                        );
+                    })()
+                }
+                hasPrevious={
+                    selectedImage &&
+                    (() => {
+                        return images.findIndex((img) => img.id === selectedImage.id) > 0;
+                    })()
+                }
             />
         </div>
     );

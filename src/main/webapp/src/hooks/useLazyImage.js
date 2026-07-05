@@ -6,25 +6,25 @@ import { useEffect, useRef, useState } from 'react';
  * The observer uses a 200px rootMargin to start loading a bit before the image is visible.
  */
 export default function useLazyImage(src) {
-  const [url, setUrl] = useState(null);
-  const imgRef = useRef(null);
+    const [url, setUrl] = useState(null);
+    const imgRef = useRef(null);
 
-  useEffect(() => {
-    if (!imgRef.current) return;
-    const observer = new IntersectionObserver(
-      entries => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            setUrl(src);
-            observer.disconnect();
-          }
-        });
-      },
-      { rootMargin: '200px' }
-    );
-    observer.observe(imgRef.current);
-    return () => observer.disconnect();
-  }, [src]);
+    useEffect(() => {
+        if (!imgRef.current) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        setUrl(src);
+                        observer.disconnect();
+                    }
+                });
+            },
+            { rootMargin: '200px' }
+        );
+        observer.observe(imgRef.current);
+        return () => observer.disconnect();
+    }, [src]);
 
-  return { imgRef, url };
+    return { imgRef, url };
 }

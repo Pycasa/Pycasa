@@ -23,4 +23,9 @@ apps/windows/resource.syso
 # Inno Setup installer output and generated branding images
 apps/windows/dist/
 apps/windows/installer_banner.bmp
-apps/windows/installer_small.bmp
+apps/windows/installer_small.bmp
+
+# Python Virtual Environment and caches
+.venv/
+__pycache__/
+*.pyc
