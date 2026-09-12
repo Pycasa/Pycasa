@@ -36,7 +36,7 @@ function cleanContent(content) {
 
 function cleanText(text) {
   if (!text) return text;
-  
+
   return text
     .replace(CLEAN_CONTENT_REGEX.jsxExpressions, '')
     .replace(CLEAN_CONTENT_REGEX.htmlEntities.quot, '"')
@@ -54,23 +54,23 @@ function extractRoutes(appJsxPath) {
     const content = fs.readFileSync(appJsxPath, 'utf8');
     const routes = new Map();
     const routeMatches = [...content.matchAll(EXTRACTION_REGEX.route)];
-    
+
     for (const match of routeMatches) {
       const routeTag = match[0];
       const pathMatch = routeTag.match(EXTRACTION_REGEX.path);
       const elementMatch = routeTag.match(EXTRACTION_REGEX.element);
       const isIndex = routeTag.includes('index');
-      
+
       if (elementMatch) {
         const componentName = elementMatch[1];
         let routePath;
-        
+
         if (isIndex) {
           routePath = '/';
         } else if (pathMatch) {
           routePath = pathMatch[1].startsWith('/') ? pathMatch[1] : `/${pathMatch[1]}`;
         }
-        
+
         routes.set(componentName, routePath);
       }
     }
@@ -87,26 +87,26 @@ function findReactFiles(dir) {
 
 function extractHelmetData(content, filePath, routes) {
   const cleanedContent = cleanContent(content);
-  
+
   if (!EXTRACTION_REGEX.helmetTest.test(cleanedContent)) {
     return null;
   }
-  
+
   const helmetMatch = content.match(EXTRACTION_REGEX.helmet);
   if (!helmetMatch) return null;
-  
+
   const helmetContent = helmetMatch[1];
   const titleMatch = helmetContent.match(EXTRACTION_REGEX.title);
   const descMatch = helmetContent.match(EXTRACTION_REGEX.description);
-  
+
   const title = cleanText(titleMatch?.[1]);
   const description = cleanText(descMatch?.[1]);
-  
+
   const fileName = path.basename(filePath, path.extname(filePath));
-  const url = routes.length && routes.has(fileName) 
-    ? routes.get(fileName) 
+  const url = routes.length && routes.has(fileName)
+    ? routes.get(fileName)
     : generateFallbackUrl(fileName);
-  
+
   return {
     url,
     title: title || 'Untitled Page',
@@ -121,10 +121,10 @@ function generateFallbackUrl(fileName) {
 
 function generateLlmsTxt(pages) {
   const sortedPages = pages.sort((a, b) => a.title.localeCompare(b.title));
-  const pageEntries = sortedPages.map(page => 
+  const pageEntries = sortedPages.map(page =>
     `- [${page.title}](${page.url}): ${page.description}`
   ).join('\n');
-  
+
   return `## Pages\n${pageEntries}`;
 }
 
@@ -149,7 +149,7 @@ function main() {
   const appJsxPath = path.join(process.cwd(), 'src', 'App.jsx');
 
   let pages = [];
-  
+
   if (!fs.existsSync(pagesDir)) {
     pages.push(processPageFile(appJsxPath, []));
   } else {
@@ -159,7 +159,7 @@ function main() {
     pages = reactFiles
       .map(filePath => processPageFile(filePath, routes))
       .filter(Boolean);
-    
+
     if (pages.length === 0) {
       console.error('❌ No pages with Helmet components found!');
       process.exit(1);
@@ -169,7 +169,7 @@ function main() {
 
   const llmsTxtContent = generateLlmsTxt(pages);
   const outputPath = path.join(process.cwd(), 'public', 'llms.txt');
-  
+
   ensureDirectoryExists(path.dirname(outputPath));
   fs.writeFileSync(outputPath, llmsTxtContent, 'utf8');
 }

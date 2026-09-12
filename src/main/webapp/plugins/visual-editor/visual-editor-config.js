@@ -88,8 +88,8 @@ export function getPopupHTMLTemplate(saveLabel, cancelLabel) {
 
 export const EDIT_MODE_STYLES = `
 	#root[data-edit-mode-enabled="true"] [data-edit-id] {
-		cursor: pointer; 
-		outline: 2px dashed #357DF9; 
+		cursor: pointer;
+		outline: 2px dashed #357DF9;
 		outline-offset: 2px;
 		min-height: 1em;
 	}
@@ -101,7 +101,7 @@ export const EDIT_MODE_STYLES = `
 	}
 	#root[data-edit-mode-enabled="true"] [data-edit-id]:hover {
 		background-color: #357DF933;
-		outline-color: #357DF9; 
+		outline-color: #357DF9;
 	}
 
 	@keyframes fadeInTooltip {
@@ -116,8 +116,8 @@ export const EDIT_MODE_STYLES = `
 	}
 
 	#inline-editor-disabled-tooltip {
-		display: none; 
-		opacity: 0; 
+		display: none;
+		opacity: 0;
 		position: absolute;
 		background-color: #1D1E20;
 		color: white;

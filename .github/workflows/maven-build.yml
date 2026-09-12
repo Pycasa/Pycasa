@@ -1,0 +1,82 @@
+name: Maven Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'The version number to build the JAR with'
+        required: true
+        type: string
+      skip-tests:
+        description: 'Whether to skip running tests'
+        required: false
+        type: boolean
+        default: false
+      retention-days:
+        description: 'Retention days for the build artifact'
+        required: false
+        type: number
+        default: 14
+    outputs:
+      version:
+        description: 'The sanitized version number used for the build'
+        value: ${{ jobs.build.outputs.version }}
+
+jobs:
+  build:
+    name: Build Maven Jar
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version-prep.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sanitize version
+        id: version-prep
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+          # Strip leading 'v' if present (e.g. v1.2.3 -> 1.2.3)
+          VERSION="${VERSION#v}"
+          # If it's a 40-character commit SHA, shorten to 7 characters
+          if [[ "$VERSION" =~ ^[0-9a-f]{40}$ ]]; then
+            VERSION="${VERSION:0:7}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Sanitized version resolved to: $VERSION"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Apply version in pom.xml
+        shell: bash
+        run: |
+          VERSION="${{ steps.version-prep.outputs.version }}"
+          # Replace 'pycasa-revision' placeholder in pom.xml with the target version
+          sed -i "s/pycasa-revision/${VERSION}/g" pom.xml
+
+      - name: Build uber-jar
+        shell: bash
+        run: |
+          if [ "${{ inputs.skip-tests }}" = "true" ]; then
+            mvn clean package -B -DskipTests
+          else
+            mvn clean package -B
+          fi
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pycasa-runner
+          path: target/*-runner.jar
+          retention-days: ${{ inputs.retention-days }}

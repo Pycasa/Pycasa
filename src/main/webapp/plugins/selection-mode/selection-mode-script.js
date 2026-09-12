@@ -162,7 +162,7 @@ function getPathToElement(element) {
 
 function getComputedStyles(element) {
 	const computedStyles = window.getComputedStyle(element);
-	
+
 	return Object.fromEntries(IMPORTANT_STYLES.map((style) => {
 		const styleValue = computedStyles.getPropertyValue(style)?.trim();
 
@@ -183,7 +183,7 @@ function extractDOMContext(element) {
 	return {
 		outerHTML: element.outerHTML,
 		selector: getPathToElement(element),
-		attributes: (element.attributes && element.attributes.length > 0) 
+		attributes: (element.attributes && element.attributes.length > 0)
 		? Object.fromEntries(Array.from(element.attributes).map((attr) => [attr.name, attr.value]))
 			: {},
 		computedStyles: getComputedStyles(element),

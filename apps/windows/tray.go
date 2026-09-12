@@ -34,7 +34,7 @@ func SetupTray(port int, onOpen func(), onSettings func(), onQuit func()) {
 			case <-mLogs.ClickedCh:
 				configDir := GetConfigDir()
 				logFilePath := filepath.Join(configDir, "logs", "pycasa.log")
-				
+
 				// Open the log file using Windows Notepad
 				cmd := exec.Command("notepad.exe", logFilePath)
 				cmd.SysProcAttr = &syscall.SysProcAttr{

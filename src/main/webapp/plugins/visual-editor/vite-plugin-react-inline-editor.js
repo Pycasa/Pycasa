@@ -3,9 +3,9 @@ import { parse } from '@babel/parser';
 import traverseBabel from '@babel/traverse';
 import * as t from '@babel/types';
 import fs from 'fs';
-import { 
-	validateFilePath, 
-	parseFileToAST, 
+import {
+	validateFilePath,
+	parseFileToAST,
 	findJSXElementAtPosition,
 	generateCode,
 	generateSourceWithMap,

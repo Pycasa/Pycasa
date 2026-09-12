@@ -47,9 +47,9 @@ func updateProgress(percent int, status string) {
 // DownloadAndInstallJRE downloads the latest Adoptium Temurin JRE 17 and unzips it into targetDir.
 func DownloadAndInstallJRE(targetDir string) error {
 	url := "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jre/hotspot/normal/eclipse"
-	
+
 	updateProgress(1, "Connecting to JRE download server...")
-	
+
 	// Create request
 	req, err := http.NewRequestWithContext(context.Background(), "GET", url, nil)
 	if err != nil {
@@ -69,7 +69,7 @@ func DownloadAndInstallJRE(targetDir string) error {
 
 	totalSize := resp.ContentLength
 	tempZipFile := filepath.Join(os.TempDir(), "pycasa_jre_temp.zip")
-	
+
 	out, err := os.Create(tempZipFile)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary zip file: %w", err)
@@ -94,7 +94,7 @@ func DownloadAndInstallJRE(targetDir string) error {
 				return fmt.Errorf("failed to write to temporary file: %w", writeErr)
 			}
 			downloaded += int64(n)
-			
+
 			// Limit progress updates to avoid flooding
 			if time.Since(lastUpdate) > 100*time.Millisecond || downloaded == totalSize {
 				var percent int
